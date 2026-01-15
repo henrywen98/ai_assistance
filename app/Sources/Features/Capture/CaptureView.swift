@@ -36,37 +36,48 @@ struct CaptureView: View {
             }
         }
         .frame(width: 400)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.2), radius: 20)
-        .onExitCommand {
-            dismiss()
-        }
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .onAppear {
             isInputFocused = true
-            setupPasteMonitor()
+            setupKeyboardMonitor()
         }
         .onDisappear {
-            removePasteMonitor()
+            removeKeyboardMonitor()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            // 失去焦点时，如果内容为空则自动关闭
+            if viewModel.inputText.isEmpty && viewModel.capturedImage == nil {
+                closeWindow()
+            }
         }
     }
 
-    /// 设置 Cmd+V 监听器
-    private func setupPasteMonitor() {
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // 检查是否是 Cmd+V
+    // MARK: - 统一关闭入口
+    private func closeWindow() {
+        CaptureWindowController.shared.hideWindow()
+    }
+
+    /// 设置键盘监听器（ESC 关闭 + Cmd+V 粘贴）
+    private func setupKeyboardMonitor() {
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // ESC 键关闭窗口
+            if event.keyCode == 53 {
+                closeWindow()
+                return nil
+            }
+            // Cmd+V 粘贴图片
             if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "v" {
-                // 检查剪贴板是否有图片
                 if handleImagePaste() {
-                    return nil // 消费事件，不传递给 TextEditor
+                    return nil
                 }
             }
-            return event // 其他事件正常传递
+            return event
         }
     }
 
-    /// 移除监听器
-    private func removePasteMonitor() {
+    /// 移除键盘监听器
+    private func removeKeyboardMonitor() {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
@@ -75,31 +86,20 @@ struct CaptureView: View {
 
     // MARK: - 输入区域
     private var inputArea: some View {
-        TextEditor(text: $viewModel.inputText)
+        TextField("输入想法，或按 ⌘+V 粘贴...", text: $viewModel.inputText, axis: .vertical)
+            .textFieldStyle(.plain)
             .font(.body)
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: 80, maxHeight: 200)
+            .lineLimit(1...10)
+            .frame(minHeight: 80)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .focused($isInputFocused)
-            .onKeyPress(.return, action: {
+            .onSubmit {
                 // Enter 提交
                 if canSubmit && !viewModel.isProcessing {
                     Task {
                         await submitCapture()
                     }
-                    return .handled
-                }
-                return .ignored
-            })
-            .overlay(alignment: .topLeading) {
-                if viewModel.inputText.isEmpty {
-                    Text("输入想法，或按 ⌘+V 粘贴...")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .padding(.leading, 21)
-                        .padding(.top, 20)
-                        .allowsHitTesting(false)
                 }
             }
     }
@@ -219,6 +219,7 @@ struct CaptureView: View {
     }
 
     // MARK: - 提交捕获
+    @MainActor
     private func submitCapture() async {
         guard canSubmit else { return }
 

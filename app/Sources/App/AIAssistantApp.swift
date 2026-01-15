@@ -6,15 +6,15 @@ import KeyboardShortcuts
 struct AIAssistantApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    /// 全局应用状态
-    @State private var appState = AppState()
-
     /// SwiftData 容器
-    var modelContainer: ModelContainer
+    let modelContainer: ModelContainer
 
     init() {
         do {
             modelContainer = try DataContainer.createContainer()
+            // 立即初始化 AppEnvironment（在任何 UI 创建之前）
+            let appState = AppState()
+            AppEnvironment.initialize(modelContainer: modelContainer, appState: appState)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
@@ -24,16 +24,13 @@ struct AIAssistantApp: App {
         // 菜单栏应用 - Story 1.2
         MenuBarExtra {
             MenuBarContentView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
-                .onAppear {
-                    configureEnvironmentIfNeeded()
-                }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "brain.head.profile")
-                if appState.pendingCaptureCount > 0 {
-                    Text("\(appState.pendingCaptureCount)")
+                if AppEnvironment.shared.appState.pendingCaptureCount > 0 {
+                    Text("\(AppEnvironment.shared.appState.pendingCaptureCount)")
                         .font(.caption2)
                 }
             }
@@ -43,14 +40,14 @@ struct AIAssistantApp: App {
         // 设置窗口
         Settings {
             SettingsView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
 
         // 捕获列表窗口（启动时自动显示）
         Window("捕获箱", id: "capture-list") {
             CaptureListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
@@ -59,7 +56,7 @@ struct AIAssistantApp: App {
         // 日历窗口
         Window("日历", id: "calendar") {
             CalendarListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 900, height: 600)
@@ -67,7 +64,7 @@ struct AIAssistantApp: App {
         // 待办窗口
         Window("待办", id: "todo") {
             TodoListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
@@ -75,7 +72,7 @@ struct AIAssistantApp: App {
         // 笔记窗口
         Window("笔记", id: "notes") {
             NotesListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
@@ -83,7 +80,7 @@ struct AIAssistantApp: App {
         // 成就窗口
         Window("成就", id: "achievement") {
             AchievementView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 900, height: 600)
@@ -91,7 +88,7 @@ struct AIAssistantApp: App {
         // 今日概览窗口
         Window("今日概览", id: "today-overview") {
             TodayOverviewView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .windowStyle(.hiddenTitleBar)
@@ -100,15 +97,10 @@ struct AIAssistantApp: App {
         // Time Sheet 窗口
         Window("Time Sheet", id: "timesheet") {
             TimeSheetView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 700, height: 500)
-    }
-
-    /// 配置全局环境（延迟初始化）
-    private func configureEnvironmentIfNeeded() {
-        AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
     }
 }
 
