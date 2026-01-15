@@ -6,25 +6,39 @@ struct CaptureListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CaptureItem.createdAt, order: .reverse) private var captures: [CaptureItem]
 
-    @State private var selectedCapture: CaptureItem?
+    @State private var selectedCaptureId: CaptureItem.ID?
     @State private var selectedCaptures: Set<CaptureItem.ID> = []
     @State private var searchText = ""
     @State private var isInBatchMode = false
     @State private var isProcessingBatch = false
 
+    /// 当前选中的捕获项
+    private var selectedCapture: CaptureItem? {
+        guard let id = selectedCaptureId else { return nil }
+        return captures.first { $0.id == id }
+    }
+
     var body: some View {
         NavigationSplitView {
-            List(filteredCaptures, selection: isInBatchMode ? $selectedCaptures : nil) { capture in
-                CaptureRowView(capture: capture)
+            List(selection: isInBatchMode ? $selectedCaptures : .init(
+                get: { selectedCaptureId.map { Set([$0]) } ?? [] },
+                set: { selectedCaptureId = $0.first }
+            )) {
+                ForEach(filteredCaptures) { capture in
+                    HStack {
+                        // 批量模式下显示 checkbox
+                        if isInBatchMode {
+                            Image(systemName: selectedCaptures.contains(capture.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selectedCaptures.contains(capture.id) ? .blue : .secondary)
+                        }
+
+                        CaptureRowView(capture: capture)
+                    }
                     .tag(capture.id)
                     .contextMenu {
                         captureContextMenu(for: capture)
                     }
-                    .onTapGesture {
-                        if !isInBatchMode {
-                            selectedCapture = capture
-                        }
-                    }
+                }
             }
             .searchable(text: $searchText, prompt: "搜索捕获...")
             .navigationTitle("捕获箱")
@@ -124,22 +138,19 @@ struct CaptureListView: View {
         Divider()
 
         Button {
-            capture.container = .calendar
-            capture.status = .confirmed
+            convertCapture(capture, to: .calendar)
         } label: {
             Label("转为日历", systemImage: "calendar")
         }
 
         Button {
-            capture.container = .todo
-            capture.status = .confirmed
+            convertCapture(capture, to: .todo)
         } label: {
             Label("转为待办", systemImage: "checklist")
         }
 
         Button {
-            capture.container = .note
-            capture.status = .confirmed
+            convertCapture(capture, to: .note)
         } label: {
             Label("转为笔记", systemImage: "note.text")
         }
@@ -151,6 +162,12 @@ struct CaptureListView: View {
         } label: {
             Label("删除", systemImage: "trash")
         }
+    }
+
+    /// 转换捕获项到指定容器
+    private func convertCapture(_ capture: CaptureItem, to container: ContainerType) {
+        ContainerConversionService.shared.manualConvert(capture, to: container, in: modelContext)
+        try? modelContext.save()
     }
 
     // MARK: - 重新分类
@@ -185,8 +202,8 @@ struct CaptureListView: View {
 
     // MARK: - 删除捕获项
     private func deleteCapture(_ capture: CaptureItem) {
-        if selectedCapture == capture {
-            selectedCapture = nil
+        if selectedCaptureId == capture.id {
+            selectedCaptureId = nil
         }
         modelContext.delete(capture)
     }
@@ -195,9 +212,9 @@ struct CaptureListView: View {
     private func batchConvert(to container: ContainerType) {
         let selectedItems = captures.filter { selectedCaptures.contains($0.id) }
         for capture in selectedItems {
-            capture.container = container
-            capture.status = .confirmed
+            ContainerConversionService.shared.manualConvert(capture, to: container, in: modelContext)
         }
+        try? modelContext.save()
         selectedCaptures.removeAll()
         isInBatchMode = false
     }
@@ -410,8 +427,8 @@ struct CaptureDetailView: View {
     private var containerPicker: some View {
         ForEach(ContainerType.allCases) { container in
             Button {
-                capture.container = container
-                capture.status = .confirmed
+                ContainerConversionService.shared.manualConvert(capture, to: container, in: modelContext)
+                try? modelContext.save()
             } label: {
                 Label(container.displayName, systemImage: container.systemImage)
             }

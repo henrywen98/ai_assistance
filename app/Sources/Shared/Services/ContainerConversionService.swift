@@ -99,11 +99,21 @@ final class ContainerConversionService {
             in: context
         )
 
-        capture.container = adjustedClassification.container
+        // 更新 CaptureItem 属性
         capture.extractedTime = adjustedClassification.extractedTime
         capture.suggestedPriority = adjustedClassification.suggestedPriority
         capture.aiSummary = adjustedClassification.summary
-        capture.status = .classified
+
+        // 根据分类结果创建实际实体
+        switch adjustedClassification.container {
+        case .calendar:
+            let startTime = adjustedClassification.extractedTime ?? Date()
+            _ = convertToCalendar(capture, startTime: startTime, in: context)
+        case .todo:
+            _ = convertToTodo(capture, dueDate: adjustedClassification.extractedTime, in: context)
+        case .note:
+            _ = convertToNote(capture, in: context)
+        }
 
         // 建立智能关联
         MemoryService.shared.establishAssociations(for: capture, in: context)

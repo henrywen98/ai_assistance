@@ -52,6 +52,25 @@ final class LLMService {
         configure()
     }
 
+    /// 测试 API 连通性
+    func testConnection() async throws -> Bool {
+        guard let openAI = openAI else {
+            throw AIAssistantError.configurationMissing("API Key")
+        }
+
+        let modelName = ProcessInfo.processInfo.environment["LLM_MODEL"] ?? "qwen-plus"
+
+        let query = ChatQuery(
+            messages: [
+                .init(role: .user, content: "ping")!
+            ],
+            model: .init(modelName)
+        )
+
+        _ = try await openAI.chats(query: query)
+        return true
+    }
+
     /// 分类文本内容（不含 Memory 上下文）
     func classify(_ text: String) async throws -> Classification {
         try await classifyWithContext(text, memoryContext: nil)

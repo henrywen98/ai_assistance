@@ -12,6 +12,9 @@ struct CaptureView: View {
     @State private var viewModel = CaptureViewModel()
     @FocusState private var isInputFocused: Bool
 
+    /// 键盘事件监听器
+    @State private var eventMonitor: Any?
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -41,18 +44,32 @@ struct CaptureView: View {
         }
         .onAppear {
             isInputFocused = true
+            setupPasteMonitor()
         }
-        .onPasteCommand(of: [.image, .tiff, .png]) { providers in
-            // 处理图片粘贴
-            for provider in providers {
-                provider.loadDataRepresentation(forTypeIdentifier: "public.image") { data, _ in
-                    if let data = data, let image = NSImage(data: data) {
-                        Task { @MainActor in
-                            viewModel.capturedImage = image
-                        }
-                    }
+        .onDisappear {
+            removePasteMonitor()
+        }
+    }
+
+    /// 设置 Cmd+V 监听器
+    private func setupPasteMonitor() {
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 检查是否是 Cmd+V
+            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "v" {
+                // 检查剪贴板是否有图片
+                if handleImagePaste() {
+                    return nil // 消费事件，不传递给 TextEditor
                 }
             }
+            return event // 其他事件正常传递
+        }
+    }
+
+    /// 移除监听器
+    private func removePasteMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 
@@ -65,6 +82,16 @@ struct CaptureView: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .focused($isInputFocused)
+            .onKeyPress(.return, action: {
+                // Enter 提交
+                if canSubmit && !viewModel.isProcessing {
+                    Task {
+                        await submitCapture()
+                    }
+                    return .handled
+                }
+                return .ignored
+            })
             .overlay(alignment: .topLeading) {
                 if viewModel.inputText.isEmpty {
                     Text("输入想法，或按 ⌘+V 粘贴...")
@@ -163,6 +190,32 @@ struct CaptureView: View {
 
     private var canSubmit: Bool {
         !viewModel.inputText.isEmpty || viewModel.capturedImage != nil
+    }
+
+    /// 处理剪贴板图片粘贴
+    private func handleImagePaste() -> Bool {
+        let pasteboard = NSPasteboard.general
+        guard let types = pasteboard.types else { return false }
+
+        // 尝试从文件 URL 读取图片
+        if types.contains(.fileURL),
+           let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           let url = urls.first,
+           let image = NSImage(contentsOf: url) {
+            viewModel.capturedImage = image
+            return true
+        }
+
+        // 尝试从直接的图片数据读取
+        for type in [NSPasteboard.PasteboardType.tiff, .png] where types.contains(type) {
+            if let data = pasteboard.data(forType: type),
+               let image = NSImage(data: data) {
+                viewModel.capturedImage = image
+                return true
+            }
+        }
+
+        return false
     }
 
     // MARK: - 提交捕获
