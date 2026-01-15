@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import os
 
 /// 通知名扩展
@@ -29,11 +30,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 始终显示在 Dock 中
         NSApp.setActivationPolicy(.regular)
 
+        // 启动分类队列后台处理
+        startClassificationQueue()
+
         // 启动时自动显示捕获箱窗口由 SwiftUI 的 .defaultLaunchBehavior(.presented) 处理
+    }
+
+    /// 启动分类队列服务和网络监听
+    private func startClassificationQueue() {
+        Task { @MainActor [logger] in
+            // 等待 AppEnvironment 初始化完成
+            try? await Task.sleep(for: .milliseconds(100))
+
+            guard let environment = AppEnvironment.shared else {
+                logger.warning("AppEnvironment 未初始化，队列服务启动失败")
+                return
+            }
+
+            let context = environment.modelContainer.mainContext
+
+            ClassificationQueueService.shared.startBackgroundProcessing(context: context)
+            logger.info("分类队列服务已启动")
+
+            NetworkMonitor.shared.onNetworkRestored = {
+                ClassificationQueueService.shared.triggerImmediateProcessing()
+            }
+            NetworkMonitor.shared.start()
+            logger.info("网络监听服务已启动")
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         // 清理资源
+        NetworkMonitor.shared.stop()
         logger.info("AIAssistant 正在退出")
     }
 
@@ -49,13 +78,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    // MARK: - System Events
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        // 应用激活时的处理
-    }
-
-    func applicationDidResignActive(_ notification: Notification) {
-        // 应用失去焦点时的处理
-    }
 }

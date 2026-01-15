@@ -34,6 +34,12 @@ final class CaptureItem {
     /// 处理状态
     var status: CaptureStatus
 
+    /// 重试计数（分类失败时递增）
+    var retryCount: Int
+
+    /// 最后一次错误信息
+    var lastError: String?
+
     /// 创建时间
     var createdAt: Date
 
@@ -51,6 +57,8 @@ final class CaptureItem {
         aiSummary: String? = nil,
         relatedCaptureIds: [UUID] = [],
         status: CaptureStatus = .pending,
+        retryCount: Int = 0,
+        lastError: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -64,21 +72,29 @@ final class CaptureItem {
         self.aiSummary = aiSummary
         self.relatedCaptureIds = relatedCaptureIds
         self.status = status
+        self.retryCount = retryCount
+        self.lastError = lastError
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 }
 
 // MARK: - 捕获状态
+
 enum CaptureStatus: String, Codable {
-    case pending = "pending"           // 待处理（等待 AI 分类）
-    case classified = "classified"     // 已分类（等待用户确认）
-    case confirmed = "confirmed"       // 已确认
-    case failed = "failed"             // 分类失败
+    /// 待处理（等待 AI 分类）
+    case pending
+    /// 已分类（等待用户确认）
+    case classified
+    /// 已确认
+    case confirmed
+    /// 分类失败
+    case failed
 }
 
 // MARK: - 优先级
+
 enum Priority: String, Codable, CaseIterable {
-    case important = "important"   // 重要
-    case normal = "normal"         // 普通
+    case important
+    case normal
 }

@@ -74,7 +74,7 @@ development_status:
   4-3-nlp-time-parse: done
   4-4-priority-auto-suggest: done
   4-5-offline-queue: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # Epic 5: OCR 与视图增强
   epic-5: done

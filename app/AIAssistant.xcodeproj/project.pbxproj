@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		07232E013983E2A8B84141FE /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34104449A4EDD5E8D96515D5 /* AppEnvironment.swift */; };
+		0A02DDDF5163B0ABE0041CED /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8C1FF329AB6F8A13445 /* NetworkMonitor.swift */; };
 		162CE2A8AA5CFDEAF57040A9 /* MemoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0D2F1018FC5A244B002B10 /* MemoryManager.swift */; };
 		1DB5BC07CC76E175456380C7 /* CaptureItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE41FCFD1DEB777DBC169C26 /* CaptureItem.swift */; };
 		23AD581189077C931B81AAA4 /* CaptureWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7C96A7C06786C49DDDCE5B /* CaptureWindowController.swift */; };
@@ -56,6 +57,7 @@
 		00C48A0C32531EA20756A671 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
 		18D7B001DCC26B111428BD4F /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		1B2389E742B5A836E8CE1528 /* TimeSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeSheetView.swift; sourceTree = "<group>"; };
+		1D08C8C1FF329AB6F8A13445 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		232D9DBF7BC374ECE419531D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		2A32CC900A5628B1E8080E25 /* DataContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataContainer.swift; sourceTree = "<group>"; };
 		34104449A4EDD5E8D96515D5 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
@@ -252,6 +254,7 @@
 				9FB011668465F808E0CE427C /* KeychainService.swift */,
 				AC3AFB01655EEEC6647B6980 /* LLMService.swift */,
 				BB0D2F1018FC5A244B002B10 /* MemoryManager.swift */,
+				1D08C8C1FF329AB6F8A13445 /* NetworkMonitor.swift */,
 				67BB7DD806E03DF93C0BF6AE /* VisionService.swift */,
 			);
 			path = Services;
@@ -379,6 +382,7 @@
 				8CB122D1ADFD8C2004AE992D /* MemoryEntry.swift in Sources */,
 				162CE2A8AA5CFDEAF57040A9 /* MemoryManager.swift in Sources */,
 				590A6780AEFD01E8E8D7563C /* MemoryService.swift in Sources */,
+				0A02DDDF5163B0ABE0041CED /* NetworkMonitor.swift in Sources */,
 				3A15751F341FFF4BF1100C92 /* Note.swift in Sources */,
 				AF9084AE850FAB2905615BBA /* NotesListView.swift in Sources */,
 				4F87B3D1B7CB6792E1513D13 /* TimeSheetView.swift in Sources */,
