@@ -1,0 +1,96 @@
+# generated: 2026-01-14
+# project: ai_assistance
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-14
+project: ai_assistance
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: 项目基础与数据架构
+  epic-1: done
+  1-1-project-init-app-launch: done
+  1-2-menubar-app-skeleton: done
+  1-3-swiftdata-core-models: done
+  1-4-base-service-skeleton: done
+  epic-1-retrospective: optional
+
+  # Epic 2: 快速捕获核心
+  epic-2: done
+  2-1-global-hotkey-capture: done
+  2-2-dock-menubar-trigger: done
+  2-3-text-paste-input: done
+  2-4-screenshot-paste: done
+  2-5-enter-confirm-send: done
+  2-6-capture-feedback-close: done
+  epic-2-retrospective: optional
+
+  # Epic 3: 容器管理与展示
+  epic-3: done
+  3-1-capture-list-view: done
+  3-2-calendar-crud: done
+  3-3-todo-crud: done
+  3-4-notes-crud: done
+  3-5-cross-container-convert: done
+  3-6-batch-process-mode: done
+  3-7-menubar-badge: done
+  epic-3-retrospective: optional
+
+  # Epic 4: AI 智能分类
+  epic-4: done
+  4-1-llm-service-impl: done
+  4-2-capture-auto-classify: done
+  4-3-nlp-time-parse: done
+  4-4-priority-auto-suggest: done
+  4-5-offline-queue: done
+  epic-4-retrospective: optional
+
+  # Epic 5: OCR 与视图增强
+  epic-5: done
+  5-1-vision-service-ocr: done
+  5-2-screenshot-auto-classify: done
+  5-3-calendar-3d-view: done
+  5-4-achievement-visual: done
+  5-5-today-overview: done
+  5-6-timesheet-auto-gen: done
+  epic-5-retrospective: optional
+
+  # Epic 6: Memory 记忆系统
+  epic-6: done
+  6-1-memory-entry-model: done
+  6-2-classify-preference-learning: done
+  6-3-common-info-storage: done
+  6-4-memory-optimize-classify: done
+  6-5-smart-association: done
+  epic-6-retrospective: optional

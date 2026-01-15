@@ -55,10 +55,11 @@ workflow_status:
     workflows:
       - id: "prd"
         name: "Product Requirements Document"
-        status: "required"
+        status: "_bmad-output/planning-artifacts/prd.md"
         agent: "pm"
         command: "/bmad:bmm:workflows:prd"
         output: "Product Requirements Document with FRs and NFRs"
+        note: "Completed: 9 sections, 25 FRs, 15 NFRs"
 
       - id: "create-ux-design"
         name: "UX Design"
@@ -74,17 +75,18 @@ workflow_status:
     workflows:
       - id: "create-architecture"
         name: "System Architecture"
-        status: "required"
+        status: "_bmad-output/planning-artifacts/architecture.md"
         agent: "architect"
         command: "/bmad:bmm:workflows:create-architecture"
         output: "System architecture document"
+        note: "Completed: SwiftUI + XcodeGen, 6 core decisions, Feature-based MVVM"
 
       - id: "create-epics-and-stories"
         name: "Epics & Stories"
-        status: "required"
+        status: "_bmad-output/planning-artifacts/epics.md"
         agent: "pm"
         command: "/bmad:bmm:workflows:create-epics-and-stories"
-        note: "Break down PRD into implementable epics and stories"
+        note: "Completed: 6 Epics, 33 Stories, 100% FR coverage"
 
       - id: "test-design"
         name: "Test Design"
@@ -95,10 +97,10 @@ workflow_status:
 
       - id: "implementation-readiness"
         name: "Implementation Readiness Check"
-        status: "required"
+        status: "_bmad-output/planning-artifacts/implementation-readiness-report-2026-01-14.md"
         agent: "architect"
         command: "/bmad:bmm:workflows:check-implementation-readiness"
-        note: "Validates PRD + Architecture + Epics + UX"
+        note: "Completed: All validations passed, 100% coverage"
 
   # Phase 4: Implementation
   - phase: 4
@@ -106,7 +108,7 @@ workflow_status:
     workflows:
       - id: "sprint-planning"
         name: "Sprint Planning"
-        status: "required"
+        status: "_bmad-output/implementation-artifacts/sprint-status.yaml"
         agent: "sm"
         command: "/bmad:bmm:workflows:sprint-planning"
-        note: "Creates sprint plan - subsequent work tracked in sprint-status.yaml"
+        note: "Completed: 6 Epics, 33 Stories tracked in sprint-status.yaml"
