@@ -44,7 +44,7 @@ development_status:
   1-2-menubar-app-skeleton: done
   1-3-swiftdata-core-models: done
   1-4-base-service-skeleton: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # Epic 2: 快速捕获核心
   epic-2: done
@@ -54,7 +54,7 @@ development_status:
   2-4-screenshot-paste: done
   2-5-enter-confirm-send: done
   2-6-capture-feedback-close: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 3: 容器管理与展示
   epic-3: done
@@ -65,7 +65,7 @@ development_status:
   3-5-cross-container-convert: done
   3-6-batch-process-mode: done
   3-7-menubar-badge: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4: AI 智能分类
   epic-4: done
