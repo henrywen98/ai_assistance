@@ -40,16 +40,15 @@ final class MemoryService {
                     type: .preference,
                     keyword: keyword,
                     content: "用户将包含「\(keyword)」的内容分类为\(correctedContainer.rawValue)",
-                    associatedContainer: correctedContainer,
-                    confidence: 0.6
+                    associatedContainer: correctedContainer
                 )
                 context.insert(entry)
                 logger.debug("创建新偏好: \(keyword) -> \(correctedContainer.rawValue)")
             }
 
-            // 降低原分类的置信度
+            // 停用原分类的偏好
             if let oldPreference = findExistingPreference(keyword: keyword, container: originalContainer, in: context) {
-                oldPreference.decreaseConfidence()
+                oldPreference.deactivate()
             }
         }
 
@@ -72,8 +71,7 @@ final class MemoryService {
                     type: .preference,
                     keyword: keyword,
                     content: "用户将包含「\(keyword)」的内容标记为\(correctedPriority.rawValue)",
-                    associatedPriority: correctedPriority,
-                    confidence: 0.6
+                    associatedPriority: correctedPriority
                 )
                 context.insert(entry)
             }
@@ -94,10 +92,10 @@ final class MemoryService {
 
         // 查找匹配的偏好
         if let preference = findBestMatchingPreference(for: content, in: context) {
-            if let container = preference.associatedContainer, preference.confidence > 0.7 {
-                // 只有高置信度的偏好才覆盖 AI 结果
+            if let container = preference.associatedContainer, preference.usageCount >= 3 {
+                // 只有使用次数足够多的偏好才覆盖 AI 结果
                 adjusted.container = container
-                logger.info("Memory 覆盖分类: \(container.rawValue) (置信度: \(preference.confidence))")
+                logger.info("Memory 覆盖分类: \(container.rawValue) (使用次数: \(preference.usageCount))")
             }
 
             if let priority = preference.associatedPriority {
@@ -119,7 +117,7 @@ final class MemoryService {
     ) -> ContainerType? {
         guard let preference = findBestMatchingPreference(for: content, in: context),
               let container = preference.associatedContainer,
-              preference.confidence > 0.5 else {
+              preference.usageCount >= 2 else {
             return nil
         }
 
@@ -172,8 +170,7 @@ final class MemoryService {
                 let entry = MemoryEntry(
                     type: .keyword,
                     keyword: keyword,
-                    content: "用户常提到的内容",
-                    confidence: 0.3
+                    content: "用户常提到的内容"
                 )
                 context.insert(entry)
                 logger.debug("新增关键词: \(keyword)")
@@ -306,8 +303,7 @@ final class MemoryService {
             let entry = MemoryEntry(
                 type: .person,
                 keyword: name,
-                content: "识别到的人物",
-                confidence: 0.5
+                content: "识别到的人物"
             )
             context.insert(entry)
         }
@@ -320,8 +316,7 @@ final class MemoryService {
             let entry = MemoryEntry(
                 type: .context,
                 keyword: name,
-                content: "识别到的项目/产品",
-                confidence: 0.5
+                content: "识别到的项目/产品"
             )
             context.insert(entry)
         }
@@ -472,10 +467,7 @@ final class MemoryService {
         in context: ModelContext
     ) -> MemoryEntry? {
         let descriptor = FetchDescriptor<MemoryEntry>(
-            sortBy: [
-                SortDescriptor(\.confidence, order: .reverse),
-                SortDescriptor(\.usageCount, order: .reverse)
-            ]
+            sortBy: [SortDescriptor(\.usageCount, order: .reverse)]
         )
 
         guard let entries = try? context.fetch(descriptor) else { return nil }

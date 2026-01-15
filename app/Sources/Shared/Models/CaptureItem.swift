@@ -16,9 +16,6 @@ final class CaptureItem {
     /// AI 分类结果（日历/待办/笔记）
     var container: ContainerType?
 
-    /// AI 分类置信度 (0.0-1.0)
-    var aiConfidence: Double
-
     /// 用户是否已确认分类
     var userConfirmed: Bool
 
@@ -48,7 +45,6 @@ final class CaptureItem {
         content: String,
         imageURL: URL? = nil,
         container: ContainerType? = nil,
-        aiConfidence: Double = 0.0,
         userConfirmed: Bool = false,
         extractedTime: Date? = nil,
         suggestedPriority: Priority = .normal,
@@ -62,7 +58,6 @@ final class CaptureItem {
         self.content = content
         self.imageURL = imageURL
         self.container = container
-        self.aiConfidence = aiConfidence
         self.userConfirmed = userConfirmed
         self.extractedTime = extractedTime
         self.suggestedPriority = suggestedPriority

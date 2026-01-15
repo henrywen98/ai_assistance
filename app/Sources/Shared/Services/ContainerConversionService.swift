@@ -100,25 +100,10 @@ final class ContainerConversionService {
         )
 
         capture.container = adjustedClassification.container
-        capture.aiConfidence = adjustedClassification.confidence
         capture.extractedTime = adjustedClassification.extractedTime
         capture.suggestedPriority = adjustedClassification.suggestedPriority
         capture.aiSummary = adjustedClassification.summary
         capture.status = .classified
-
-        // 如果置信度高于阈值，自动创建对应项
-        if adjustedClassification.confidence >= 0.8 {
-            switch adjustedClassification.container {
-            case .calendar:
-                if let time = adjustedClassification.extractedTime {
-                    _ = convertToCalendar(capture, startTime: time, in: context)
-                }
-            case .todo:
-                _ = convertToTodo(capture, in: context)
-            case .note:
-                _ = convertToNote(capture, in: context)
-            }
-        }
 
         // 建立智能关联
         MemoryService.shared.establishAssociations(for: capture, in: context)

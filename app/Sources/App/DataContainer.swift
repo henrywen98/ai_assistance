@@ -49,7 +49,6 @@ enum DataContainer {
         let capture1 = CaptureItem(
             content: "明天下午3点和小王开会",
             container: .calendar,
-            aiConfidence: 0.92,
             userConfirmed: true,
             status: .confirmed
         )

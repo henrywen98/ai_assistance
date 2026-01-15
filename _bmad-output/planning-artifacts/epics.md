@@ -577,7 +577,7 @@ This document provides the complete epic and story breakdown for ai_assistance, 
 **Given** API Key 已配置（环境变量或 Keychain）
 **When** 调用 `llmService.classify(text)`
 **Then** 返回 Classification 结构体
-**And** 包含：container, confidence, extractedTime, priority, summary
+**And** 包含：container, extractedTime, priority, summary
 
 ---
 

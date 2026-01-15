@@ -5,9 +5,6 @@ struct Classification: Codable, Equatable {
     /// 目标容器
     var container: ContainerType
 
-    /// 置信度 (0.0-1.0)
-    var confidence: Double
-
     /// 提取的时间（日历事件用）
     var extractedTime: Date?
 
@@ -19,13 +16,11 @@ struct Classification: Codable, Equatable {
 
     init(
         container: ContainerType,
-        confidence: Double = 0.8,
         extractedTime: Date? = nil,
         suggestedPriority: Priority = .normal,
         summary: String = ""
     ) {
         self.container = container
-        self.confidence = confidence
         self.extractedTime = extractedTime
         self.suggestedPriority = suggestedPriority
         self.summary = summary
@@ -38,7 +33,6 @@ extension Classification {
     static func defaultTodo(summary: String = "") -> Classification {
         Classification(
             container: .todo,
-            confidence: 0.5,
             extractedTime: nil,
             suggestedPriority: .normal,
             summary: summary
@@ -49,15 +43,9 @@ extension Classification {
     static func defaultNote(summary: String = "") -> Classification {
         Classification(
             container: .note,
-            confidence: 0.5,
             extractedTime: nil,
             suggestedPriority: .normal,
             summary: summary
         )
-    }
-
-    /// 是否高置信度
-    var isHighConfidence: Bool {
-        confidence >= 0.8
     }
 }

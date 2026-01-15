@@ -34,9 +34,6 @@ final class MemoryEntry {
     /// 使用次数
     var usageCount: Int
 
-    /// 置信度 (0.0 - 1.0)
-    var confidence: Double
-
     /// 是否启用
     var isActive: Bool
 
@@ -54,8 +51,7 @@ final class MemoryEntry {
         keyword: String,
         content: String = "",
         associatedContainer: ContainerType? = nil,
-        associatedPriority: Priority? = nil,
-        confidence: Double = 0.5
+        associatedPriority: Priority? = nil
     ) {
         self.id = UUID()
         self.type = type
@@ -64,7 +60,6 @@ final class MemoryEntry {
         self.associatedContainer = associatedContainer
         self.associatedPriority = associatedPriority
         self.usageCount = 1
-        self.confidence = confidence
         self.isActive = true
         self.createdAt = Date()
         self.lastUsedAt = Date()
@@ -74,16 +69,11 @@ final class MemoryEntry {
     func recordUsage() {
         usageCount += 1
         lastUsedAt = Date()
-        // 提升置信度（衰减增长）
-        confidence = min(1.0, confidence + (1.0 - confidence) * 0.1)
     }
 
-    /// 降低置信度（用于纠正）
-    func decreaseConfidence() {
-        confidence = max(0.1, confidence * 0.7)
-        if confidence < 0.2 {
-            isActive = false
-        }
+    /// 停用规则（用于纠正）
+    func deactivate() {
+        isActive = false
     }
 }
 
@@ -95,7 +85,7 @@ extension MemoryEntry {
         in context: ModelContext
     ) -> MemoryEntry? {
         let descriptor = FetchDescriptor<MemoryEntry>(
-            sortBy: [SortDescriptor(\.confidence, order: .reverse)]
+            sortBy: [SortDescriptor(\.usageCount, order: .reverse)]
         )
 
         guard let entries = try? context.fetch(descriptor) else {
@@ -123,10 +113,7 @@ extension MemoryEntry {
         limit: Int = 10
     ) -> [MemoryEntry] {
         let descriptor = FetchDescriptor<MemoryEntry>(
-            sortBy: [
-                SortDescriptor(\.usageCount, order: .reverse),
-                SortDescriptor(\.confidence, order: .reverse)
-            ]
+            sortBy: [SortDescriptor(\.usageCount, order: .reverse)]
         )
 
         guard let entries = try? context.fetch(descriptor) else {

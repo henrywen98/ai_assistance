@@ -227,17 +227,9 @@ struct CaptureRowView: View {
                 containerBadge
             }
 
-            HStack {
-                Text(capture.createdAt.formatted(.relative(presentation: .named)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                if capture.aiConfidence > 0 {
-                    Text("置信度: \(Int(capture.aiConfidence * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            Text(capture.createdAt.formatted(.relative(presentation: .named)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
     }
@@ -399,10 +391,6 @@ struct CaptureDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 if let summary = capture.aiSummary {
                     LabeledContent("摘要", value: summary)
-                }
-
-                if capture.aiConfidence > 0 {
-                    LabeledContent("置信度", value: "\(Int(capture.aiConfidence * 100))%")
                 }
 
                 if let time = capture.extractedTime {

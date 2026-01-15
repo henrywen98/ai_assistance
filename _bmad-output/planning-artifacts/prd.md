@@ -345,7 +345,6 @@ Capture (捕获条目)
 ├── content (text / image_path)
 ├── created_at
 ├── container (calendar / todo / note)
-├── ai_classification_confidence
 └── user_confirmed
 
 Calendar (日历条目)

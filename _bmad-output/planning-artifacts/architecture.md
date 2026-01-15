@@ -416,7 +416,6 @@ struct CaptureView: View {
 ```swift
 struct Classification: Codable {
     let container: ContainerType      // 目标容器
-    let confidence: Double            // 置信度 0.0-1.0
     let extractedTime: Date?          // 解析的时间
     let suggestedPriority: Priority   // 建议优先级
     let summary: String               // AI 摘要

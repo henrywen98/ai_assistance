@@ -31,13 +31,17 @@ final class LLMService {
             return
         }
 
-        // Dashscope 兼容模式
-        let baseURL = ProcessInfo.processInfo.environment["LLM_BASE_URL"]
-            ?? "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        // Dashscope 兼容模式配置
+        let host = ProcessInfo.processInfo.environment["LLM_HOST"]
+            ?? "dashscope.aliyuncs.com"
+        let basePath = ProcessInfo.processInfo.environment["LLM_BASE_PATH"]
+            ?? "/compatible-mode/v1"
 
         let configuration = OpenAI.Configuration(
             token: apiKey,
-            host: baseURL
+            host: host,
+            scheme: "https",
+            basePath: basePath
         )
         openAI = OpenAI(configuration: configuration)
     }
@@ -84,7 +88,6 @@ final class LLMService {
         请返回 JSON 格式：
         {
             "container": "calendar|todo|note",
-            "confidence": 0.0-1.0,
             "extractedTime": "ISO8601格式时间（如有）",
             "suggestedPriority": "important|normal",
             "summary": "简短摘要"
@@ -119,7 +122,7 @@ final class LLMService {
     /// 获取适用的偏好规则
     private func getPreferenceRules(for text: String, in context: ModelContext) -> String {
         let descriptor = FetchDescriptor<MemoryEntry>(
-            sortBy: [SortDescriptor(\.confidence, order: .reverse)]
+            sortBy: [SortDescriptor(\.usageCount, order: .reverse)]
         )
 
         guard let entries = try? context.fetch(descriptor) else { return "" }
@@ -127,7 +130,6 @@ final class LLMService {
         let preferences = entries.filter { entry in
             entry.type == .preference &&
             entry.isActive &&
-            entry.confidence > 0.6 &&
             text.localizedCaseInsensitiveContains(entry.keyword)
         }
 
@@ -151,7 +153,6 @@ final class LLMService {
 
         struct LLMResponse: Decodable {
             let container: String
-            let confidence: Double
             let extractedTime: String?
             let suggestedPriority: String
             let summary: String
@@ -179,7 +180,6 @@ final class LLMService {
 
         return Classification(
             container: containerType,
-            confidence: response.confidence,
             extractedTime: extractedTime,
             suggestedPriority: priority,
             summary: response.summary
