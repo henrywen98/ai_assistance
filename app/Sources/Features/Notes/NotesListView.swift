@@ -101,6 +101,9 @@ struct NoteDetailView: View {
     @State private var isEditing = false
     @State private var editingTitle = ""
 
+    /// 上一次同步的笔记 ID，用于检测笔记切换
+    @State private var lastSyncedNoteId: UUID?
+
     var body: some View {
         VStack(spacing: 0) {
             // 标题编辑
@@ -109,12 +112,17 @@ struct NoteDetailView: View {
                 .fontWeight(.bold)
                 .textFieldStyle(.plain)
                 .padding()
-                .onChange(of: editingTitle) { _, newValue in
+                .onChange(of: editingTitle) { oldValue, newValue in
+                    // 跳过初始同步或无变化的情况
+                    guard lastSyncedNoteId == note.id, oldValue != newValue else { return }
                     note.title = newValue.isEmpty ? nil : newValue
                     note.updatedAt = Date()
                 }
+                .onChange(of: note.id) { _, newId in
+                    syncTitle(for: newId)
+                }
                 .onAppear {
-                    editingTitle = note.title ?? ""
+                    syncTitle(for: note.id)
                 }
 
             Divider()
@@ -198,6 +206,12 @@ struct NoteDetailView: View {
         }
         .padding()
         .background(.quaternary)
+    }
+
+    /// 同步标题状态，标记当前笔记 ID 以区分用户编辑和初始加载
+    private func syncTitle(for noteId: UUID) {
+        editingTitle = note.title ?? ""
+        lastSyncedNoteId = noteId
     }
 }
 

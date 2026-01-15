@@ -18,7 +18,10 @@ final class HotkeyManager {
     /// 设置快捷键监听
     func setupHotkeys() {
         KeyboardShortcuts.onKeyUp(for: .quickCapture) { [weak self] in
-            self?.handleQuickCapture()
+            // 确保在主线程执行
+            Task { @MainActor in
+                self?.handleQuickCapture()
+            }
         }
     }
 

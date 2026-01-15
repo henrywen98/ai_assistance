@@ -12,6 +12,9 @@ struct CaptureView: View {
     @State private var viewModel = CaptureViewModel()
     @FocusState private var isInputFocused: Bool
 
+    /// 键盘事件监听器
+    @State private var eventMonitor: Any?
+
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
@@ -33,46 +36,70 @@ struct CaptureView: View {
             }
         }
         .frame(width: 400)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.2), radius: 20)
-        .onExitCommand {
-            dismiss()
-        }
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .onAppear {
             isInputFocused = true
+            setupKeyboardMonitor()
         }
-        .onPasteCommand(of: [.image, .tiff, .png]) { providers in
-            // 处理图片粘贴
-            for provider in providers {
-                provider.loadDataRepresentation(forTypeIdentifier: "public.image") { data, _ in
-                    if let data = data, let image = NSImage(data: data) {
-                        Task { @MainActor in
-                            viewModel.capturedImage = image
-                        }
-                    }
+        .onDisappear {
+            removeKeyboardMonitor()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            // 失去焦点时，如果内容为空则自动关闭
+            if viewModel.inputText.isEmpty && viewModel.capturedImage == nil {
+                closeWindow()
+            }
+        }
+    }
+
+    // MARK: - 统一关闭入口
+    private func closeWindow() {
+        CaptureWindowController.shared.hideWindow()
+    }
+
+    /// 设置键盘监听器（ESC 关闭 + Cmd+V 粘贴）
+    private func setupKeyboardMonitor() {
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // ESC 键关闭窗口
+            if event.keyCode == 53 {
+                closeWindow()
+                return nil
+            }
+            // Cmd+V 粘贴图片
+            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "v" {
+                if handleImagePaste() {
+                    return nil
                 }
             }
+            return event
+        }
+    }
+
+    /// 移除键盘监听器
+    private func removeKeyboardMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 
     // MARK: - 输入区域
     private var inputArea: some View {
-        TextEditor(text: $viewModel.inputText)
+        TextField("输入想法，或按 ⌘+V 粘贴...", text: $viewModel.inputText, axis: .vertical)
+            .textFieldStyle(.plain)
             .font(.body)
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: 80, maxHeight: 200)
+            .lineLimit(1...10)
+            .frame(minHeight: 80)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .focused($isInputFocused)
-            .overlay(alignment: .topLeading) {
-                if viewModel.inputText.isEmpty {
-                    Text("输入想法，或按 ⌘+V 粘贴...")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .padding(.leading, 21)
-                        .padding(.top, 20)
-                        .allowsHitTesting(false)
+            .onSubmit {
+                // Enter 提交
+                if canSubmit && !viewModel.isProcessing {
+                    Task {
+                        await submitCapture()
+                    }
                 }
             }
     }
@@ -165,7 +192,34 @@ struct CaptureView: View {
         !viewModel.inputText.isEmpty || viewModel.capturedImage != nil
     }
 
+    /// 处理剪贴板图片粘贴
+    private func handleImagePaste() -> Bool {
+        let pasteboard = NSPasteboard.general
+        guard let types = pasteboard.types else { return false }
+
+        // 尝试从文件 URL 读取图片
+        if types.contains(.fileURL),
+           let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           let url = urls.first,
+           let image = NSImage(contentsOf: url) {
+            viewModel.capturedImage = image
+            return true
+        }
+
+        // 尝试从直接的图片数据读取
+        for type in [NSPasteboard.PasteboardType.tiff, .png] where types.contains(type) {
+            if let data = pasteboard.data(forType: type),
+               let image = NSImage(data: data) {
+                viewModel.capturedImage = image
+                return true
+            }
+        }
+
+        return false
+    }
+
     // MARK: - 提交捕获
+    @MainActor
     private func submitCapture() async {
         guard canSubmit else { return }
 

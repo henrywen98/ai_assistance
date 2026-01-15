@@ -6,15 +6,15 @@ import KeyboardShortcuts
 struct AIAssistantApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    /// 全局应用状态
-    @State private var appState = AppState()
-
     /// SwiftData 容器
-    var modelContainer: ModelContainer
+    let modelContainer: ModelContainer
 
     init() {
         do {
             modelContainer = try DataContainer.createContainer()
+            // 立即初始化 AppEnvironment（在任何 UI 创建之前）
+            let appState = AppState()
+            AppEnvironment.initialize(modelContainer: modelContainer, appState: appState)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
@@ -24,16 +24,13 @@ struct AIAssistantApp: App {
         // 菜单栏应用 - Story 1.2
         MenuBarExtra {
             MenuBarContentView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
-                .onAppear {
-                    configureEnvironmentIfNeeded()
-                }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "brain.head.profile")
-                if appState.pendingCaptureCount > 0 {
-                    Text("\(appState.pendingCaptureCount)")
+                if AppEnvironment.shared.appState.pendingCaptureCount > 0 {
+                    Text("\(AppEnvironment.shared.appState.pendingCaptureCount)")
                         .font(.caption2)
                 }
             }
@@ -43,22 +40,23 @@ struct AIAssistantApp: App {
         // 设置窗口
         Settings {
             SettingsView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
 
-        // 捕获列表窗口
+        // 捕获列表窗口（启动时自动显示）
         Window("捕获箱", id: "capture-list") {
             CaptureListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
+        .defaultLaunchBehavior(.presented)
 
         // 日历窗口
         Window("日历", id: "calendar") {
             CalendarListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 900, height: 600)
@@ -66,7 +64,7 @@ struct AIAssistantApp: App {
         // 待办窗口
         Window("待办", id: "todo") {
             TodoListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
@@ -74,7 +72,7 @@ struct AIAssistantApp: App {
         // 笔记窗口
         Window("笔记", id: "notes") {
             NotesListView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 800, height: 600)
@@ -82,7 +80,7 @@ struct AIAssistantApp: App {
         // 成就窗口
         Window("成就", id: "achievement") {
             AchievementView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 900, height: 600)
@@ -90,7 +88,7 @@ struct AIAssistantApp: App {
         // 今日概览窗口
         Window("今日概览", id: "today-overview") {
             TodayOverviewView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .windowStyle(.hiddenTitleBar)
@@ -99,15 +97,10 @@ struct AIAssistantApp: App {
         // Time Sheet 窗口
         Window("Time Sheet", id: "timesheet") {
             TimeSheetView()
-                .environment(appState)
+                .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
         .defaultSize(width: 700, height: 500)
-    }
-
-    /// 配置全局环境（延迟初始化）
-    private func configureEnvironmentIfNeeded() {
-        AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
     }
 }
 
@@ -116,7 +109,11 @@ struct MenuBarContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.dismiss) private var dismiss
     @Query private var allCaptures: [CaptureItem]
+
+    /// 点击菜单栏直接打开捕获
+    @AppStorage("directCaptureOnMenuBarClick") private var directCaptureMode = false
 
     private var pendingCaptures: [CaptureItem] {
         allCaptures.filter { $0.status == .pending }
@@ -222,6 +219,18 @@ struct MenuBarContentView: View {
         .onChange(of: pendingCaptures.count, initial: true) { _, newCount in
             appState.updatePendingCount(newCount)
         }
+        .onAppear {
+            // 如果启用了直接捕获模式，立即打开捕获窗口
+            if directCaptureMode {
+                CaptureWindowController.shared.showWindow()
+                dismiss()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openDashboard)) { _ in
+            // 点击 Dock 图标时打开捕获箱窗口
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "capture-list")
+        }
     }
 }
 
@@ -249,18 +258,56 @@ struct GeneralSettingsView: View {
     @State private var showingSaveConfirmation = false
     @State private var isConfigured = LLMService.shared.isConfigured
 
+    /// API 测试状态
+    @State private var isTesting = false
+    @State private var testResult: TestResult?
+
+    enum TestResult {
+        case success
+        case failure(String)
+    }
+
+    /// 点击菜单栏直接打开捕获
+    @AppStorage("directCaptureOnMenuBarClick") private var directCaptureMode = false
+
+    /// 在 Dock 中显示图标
+    @AppStorage("showInDock") private var showInDock = false
+
     var body: some View {
         Form {
             Section("AI 服务配置") {
                 HStack {
                     Text("状态")
                     Spacer()
-                    if isConfigured {
+
+                    if isTesting {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("测试中...")
+                            .foregroundStyle(.secondary)
+                    } else if let result = testResult {
+                        switch result {
+                        case .success:
+                            Label("连接成功", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        case .failure(let error):
+                            Label("连接失败", systemImage: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                                .help(error)
+                        }
+                    } else if isConfigured {
                         Label("已配置", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
                         Label("未配置", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
+                    }
+
+                    if isConfigured && !isTesting {
+                        Button("测试") {
+                            testAPIConnection()
+                        }
+                        .buttonStyle(.bordered)
                     }
                 }
 
@@ -276,6 +323,21 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("显示方式") {
+                Toggle("在 Dock 中显示图标", isOn: $showInDock)
+                    .onChange(of: showInDock) { _, newValue in
+                        updateDockVisibility(newValue)
+                    }
+                Text("菜单栏拥挤时可启用此选项，从 Dock 访问应用")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("点击菜单栏直接打开捕获窗口", isOn: $directCaptureMode)
+                Text("启用后点击菜单栏图标将直接弹出捕获输入框")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .alert("保存成功", isPresented: $showingSaveConfirmation) {
@@ -285,6 +347,17 @@ struct GeneralSettingsView: View {
         }
         .onAppear {
             isConfigured = LLMService.shared.isConfigured
+            // 恢复 Dock 可见性设置
+            updateDockVisibility(showInDock)
+        }
+    }
+
+    /// 更新 Dock 图标可见性
+    private func updateDockVisibility(_ show: Bool) {
+        if show {
+            NSApp.setActivationPolicy(.regular)
+        } else {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 
@@ -293,9 +366,25 @@ struct GeneralSettingsView: View {
             try LLMService.shared.reconfigure(with: apiKey)
             apiKey = ""
             isConfigured = true
+            testResult = nil  // 重置测试结果
             showingSaveConfirmation = true
         } catch {
             print("[Settings] Failed to save API key: \(error.localizedDescription)")
+        }
+    }
+
+    private func testAPIConnection() {
+        isTesting = true
+        testResult = nil
+
+        Task {
+            do {
+                _ = try await LLMService.shared.testConnection()
+                testResult = .success
+            } catch {
+                testResult = .failure(error.localizedDescription)
+            }
+            isTesting = false
         }
     }
 }

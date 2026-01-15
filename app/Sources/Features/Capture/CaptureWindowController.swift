@@ -4,85 +4,35 @@ import SwiftData
 import os
 
 /// 捕获窗口控制器 - 管理快速捕获浮窗
+/// 整个类都在 @MainActor 隔离下，确保线程安全
 @MainActor
-final class CaptureWindowController {
+final class CaptureWindowController: NSObject {
     private let logger = Logger(subsystem: "com.henry.AIAssistant", category: "CaptureWindow")
-    /// 单例
+
+    /// 单例 - 使用 @MainActor 确保在主线程初始化
     static let shared = CaptureWindowController()
 
-    /// 窗口实例
-    private var window: NSWindow?
+    /// 当前窗口 - 受 @MainActor 保护
+    private var currentWindow: NSWindow?
 
-    private init() {}
+    private override init() {
+        super.init()
+    }
 
-    /// 显示捕获窗口
     func showWindow() {
-        if window == nil {
-            createWindow()
+        if let window = currentWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
 
-        guard let window = window else { return }
-
-        // 居中显示在屏幕上
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let windowSize = window.frame.size
-            let x = screenFrame.midX - windowSize.width / 2
-            let y = screenFrame.midY - windowSize.height / 2 + 100 // 稍微偏上
-            window.setFrameOrigin(NSPoint(x: x, y: y))
-        }
-
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    /// 隐藏捕获窗口
-    func hideWindow() {
-        window?.orderOut(nil)
-    }
-
-    /// 切换窗口显示状态
-    func toggleWindow() {
-        if window?.isVisible == true {
-            hideWindow()
-        } else {
-            showWindow()
-        }
-    }
-
-    /// 创建窗口
-    private func createWindow() {
-        logger.info("createWindow() 被调用")
-
-        // 获取或创建环境
-        let modelContainer: ModelContainer
-        let appState: AppState
-
-        if let container = AppEnvironment.shared.modelContainer,
-           let state = AppEnvironment.shared.appState {
-            modelContainer = container
-            appState = state
-            logger.info("使用 AppEnvironment 中的环境")
-        } else {
-            // 备用方案：自己创建
-            logger.warning("AppEnvironment 未配置，创建新环境")
-            do {
-                modelContainer = try DataContainer.createContainer()
-                appState = AppState()
-                AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
-            } catch {
-                logger.error("创建环境失败: \(error.localizedDescription)")
-                return
-            }
-        }
-
-        logger.info("环境检查通过，开始创建窗口")
+        logger.info("创建新捕获窗口")
 
         let contentView = CaptureView()
-            .environment(appState)
-            .modelContainer(modelContainer)
+            .modelContainer(AppEnvironment.shared.modelContainer)
+            .environment(AppEnvironment.shared.appState)
 
-        let hostingView = NSHostingView(rootView: contentView)
+        let hostingView = NSHostingView(rootView: AnyView(contentView))
 
         let window = KeyableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 150),
@@ -98,26 +48,40 @@ final class CaptureWindowController {
         window.hasShadow = true
         window.isMovableByWindowBackground = true
 
-        // 设置窗口代理以处理关闭事件
-        window.delegate = WindowDelegate.shared
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            let x = screenFrame.midX - 200
+            let y = screenFrame.midY + 50
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
 
-        self.window = window
+        currentWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        logger.info("捕获窗口显示成功")
+    }
+
+    func hideWindow() {
+        currentWindow?.orderOut(nil)
+        currentWindow = nil
+    }
+
+    func toggleWindow() {
+        if currentWindow?.isVisible == true {
+            hideWindow()
+        } else {
+            showWindow()
+        }
     }
 }
 
-// MARK: - 自定义窗口类（支持无边框窗口接收键盘输入）
+// MARK: - 自定义窗口类
 private final class KeyableWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
-}
 
-// MARK: - 窗口代理
-@MainActor
-private final class WindowDelegate: NSObject, NSWindowDelegate {
-    static let shared = WindowDelegate()
-
-    func windowDidResignKey(_ notification: Notification) {
-        // 可选：失去焦点时隐藏窗口
-        // CaptureWindowController.shared.hideWindow()
+    override func close() {
+        CaptureWindowController.shared.hideWindow()
     }
 }
