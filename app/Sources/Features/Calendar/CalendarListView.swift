@@ -1,10 +1,11 @@
 import SwiftUI
 import SwiftData
 
-/// 视图模式
+/// 日历视图模式
 enum CalendarViewMode: String, CaseIterable {
     case list = "列表"
-    case timeline = "时间线"
+    case day = "天"
+    case week = "周"
 }
 
 /// 日历事件列表视图
@@ -15,95 +16,163 @@ struct CalendarListView: View {
 
     @State private var selectedEvent: CalendarEvent?
     @State private var showingAddSheet = false
-    @State private var viewMode: CalendarViewMode = .timeline
+    @State private var viewMode: CalendarViewMode = .day
+    @State private var currentDate = Date()
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                // 视图模式切换
-                Picker("视图", selection: $viewMode) {
-                    ForEach(CalendarViewMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding()
+        VStack(spacing: 0) {
+            // 顶部工具栏
+            calendarToolbar
 
-                // 内容区域
-                switch viewMode {
-                case .list:
-                    calendarListContent
-                case .timeline:
-                    Calendar3DTimelineView(
-                        pastEvents: pastEvents,
-                        todayEvents: todayEvents,
-                        futureEvents: futureEvents,
-                        selectedEvent: $selectedEvent
-                    )
-                }
-            }
-            .navigationTitle("日历")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Label("新建事件", systemImage: "plus")
+            // 日历内容区域（全宽）
+            switch viewMode {
+            case .day:
+                DayCalendarView(
+                    date: currentDate,
+                    events: eventsForDate(currentDate),
+                    onEventTap: { event in
+                        selectedEvent = event
                     }
-                }
-            }
-            .sheet(isPresented: $showingAddSheet) {
-                CalendarEventEditView(event: nil)
-            }
-        } detail: {
-            if let event = selectedEvent {
-                CalendarEventDetailView(event: event)
-            } else {
-                ContentUnavailableView(
-                    "选择一个事件",
-                    systemImage: "calendar",
-                    description: Text("从左侧列表选择查看详情")
+                )
+            case .week:
+                WeekCalendarView(
+                    startOfWeek: startOfWeek(for: currentDate),
+                    allEvents: allEvents,
+                    onEventTap: { event in
+                        selectedEvent = event
+                    }
+                )
+            case .list:
+                CalendarListContent(
+                    allEvents: allEvents,
+                    onEventTap: { event in
+                        selectedEvent = event
+                    }
                 )
             }
         }
-    }
-
-    // MARK: - 列表视图内容
-    private var calendarListContent: some View {
-        List(selection: $selectedEvent) {
-            // 今日事件
-            if !todayEvents.isEmpty {
-                Section("今日") {
-                    ForEach(todayEvents) { event in
-                        CalendarEventRow(event: event)
-                            .tag(event)
-                    }
-                }
-            }
-
-            // 即将到来
-            if !futureEvents.isEmpty {
-                Section("即将到来") {
-                    ForEach(futureEvents) { event in
-                        CalendarEventRow(event: event)
-                            .tag(event)
-                    }
-                }
-            }
-
-            // 已完成
-            if !pastEvents.isEmpty {
-                Section("已完成") {
-                    ForEach(pastEvents) { event in
-                        CalendarEventRow(event: event)
-                            .tag(event)
-                    }
-                }
-            }
+        .sheet(isPresented: $showingAddSheet) {
+            CalendarEventEditView(event: nil)
+        }
+        .sheet(item: $selectedEvent) { event in
+            CalendarEventDetailSheet(event: event)
         }
     }
 
-    // MARK: - 过去事件（已完成）
+    // MARK: - 顶部工具栏
+    private var calendarToolbar: some View {
+        HStack(spacing: 12) {
+            // 日期导航
+            HStack(spacing: 4) {
+                Button {
+                    navigateDate(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    currentDate = Date()
+                } label: {
+                    Text("今天")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    navigateDate(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // 当前日期显示
+            Text(dateTitle)
+                .font(.headline)
+                .frame(minWidth: 120)
+
+            Spacer()
+
+            // 视图模式切换
+            Picker("", selection: $viewMode) {
+                ForEach(CalendarViewMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
+
+            // 新建按钮
+            Button {
+                showingAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private var dateTitle: String {
+        let formatter = DateFormatter()
+        switch viewMode {
+        case .day:
+            formatter.dateFormat = "M月d日 EEEE"
+        case .week:
+            let weekStart = startOfWeek(for: currentDate)
+            let weekEnd = Calendar.current.date(byAdding: .day, value: 6, to: weekStart)!
+            let startFormatter = DateFormatter()
+            startFormatter.dateFormat = "M月d日"
+            let endFormatter = DateFormatter()
+            endFormatter.dateFormat = "d日"
+            return "\(startFormatter.string(from: weekStart)) - \(endFormatter.string(from: weekEnd))"
+        case .list:
+            formatter.dateFormat = "yyyy年M月"
+        }
+        return formatter.string(from: currentDate)
+    }
+
+    private func navigateDate(by value: Int) {
+        let calendar = Calendar.current
+        switch viewMode {
+        case .day:
+            currentDate = calendar.date(byAdding: .day, value: value, to: currentDate) ?? currentDate
+        case .week:
+            currentDate = calendar.date(byAdding: .weekOfYear, value: value, to: currentDate) ?? currentDate
+        case .list:
+            currentDate = calendar.date(byAdding: .month, value: value, to: currentDate) ?? currentDate
+        }
+    }
+
+    private func startOfWeek(for date: Date) -> Date {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return calendar.date(from: components) ?? date
+    }
+
+    private func eventsForDate(_ date: Date) -> [CalendarEvent] {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+
+        return allEvents.filter { event in
+            event.startTime >= startOfDay && event.startTime < endOfDay
+        }
+    }
+
+}
+
+// MARK: - 列表视图内容
+struct CalendarListContent: View {
+    let allEvents: [CalendarEvent]
+    let onEventTap: (CalendarEvent) -> Void
+
     private var pastEvents: [CalendarEvent] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -111,260 +180,359 @@ struct CalendarListView: View {
             .sorted { $0.startTime > $1.startTime }
     }
 
-    // MARK: - 今日事件
     private var todayEvents: [CalendarEvent] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
-
         return allEvents.filter { event in
             !event.isCompleted && event.startTime >= today && event.startTime < tomorrow
         }
     }
 
-    // MARK: - 未来事件
     private var futureEvents: [CalendarEvent] {
         let calendar = Calendar.current
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date()))!
-
         return allEvents.filter { event in
             !event.isCompleted && event.startTime >= tomorrow
         }
     }
-}
-
-// MARK: - 3D 时间线视图
-struct Calendar3DTimelineView: View {
-    let pastEvents: [CalendarEvent]
-    let todayEvents: [CalendarEvent]
-    let futureEvents: [CalendarEvent]
-    @Binding var selectedEvent: CalendarEvent?
-
-    @State private var scrollOffset: CGFloat = 0
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // 过去区域（成就）
-                TimelineSection(
-                    title: "过去 · 成就",
-                    icon: "checkmark.seal.fill",
-                    color: .green,
-                    perspective: .past,
-                    events: pastEvents.prefix(5).map { $0 },
-                    selectedEvent: $selectedEvent,
-                    emptyMessage: "暂无已完成事件"
-                )
-
-                // 当前区域
-                TimelineSection(
-                    title: "现在 · 今日",
-                    icon: "star.fill",
-                    color: .orange,
-                    perspective: .present,
-                    events: todayEvents,
-                    selectedEvent: $selectedEvent,
-                    emptyMessage: "今日无安排"
-                )
-
-                // 未来区域
-                TimelineSection(
-                    title: "未来 · 安心",
-                    icon: "arrow.forward.circle.fill",
-                    color: .blue,
-                    perspective: .future,
-                    events: futureEvents.prefix(5).map { $0 },
-                    selectedEvent: $selectedEvent,
-                    emptyMessage: "暂无未来安排"
-                )
+        List {
+            if !todayEvents.isEmpty {
+                Section("今日") {
+                    ForEach(todayEvents) { event in
+                        CalendarEventRow(event: event)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onEventTap(event) }
+                    }
+                }
             }
-            .padding()
-        }
-        .background(
-            LinearGradient(
-                colors: [.green.opacity(0.05), .orange.opacity(0.1), .blue.opacity(0.05)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-}
 
-// MARK: - 时间线透视
-enum TimelinePerspective {
-    case past, present, future
+            if !futureEvents.isEmpty {
+                Section("即将到来") {
+                    ForEach(futureEvents) { event in
+                        CalendarEventRow(event: event)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onEventTap(event) }
+                    }
+                }
+            }
 
-    var opacity: Double {
-        switch self {
-        case .past: return 0.7
-        case .present: return 1.0
-        case .future: return 0.85
-        }
-    }
-
-    var scale: CGFloat {
-        switch self {
-        case .past: return 0.92
-        case .present: return 1.0
-        case .future: return 0.96
-        }
-    }
-
-    var blur: CGFloat {
-        switch self {
-        case .past: return 0.5
-        case .present: return 0
-        case .future: return 0.2
+            if !pastEvents.isEmpty {
+                Section("已完成") {
+                    ForEach(pastEvents) { event in
+                        CalendarEventRow(event: event)
+                            .contentShape(Rectangle())
+                            .onTapGesture { onEventTap(event) }
+                    }
+                }
+            }
         }
     }
 }
 
-// MARK: - 时间线区块
-struct TimelineSection: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let perspective: TimelinePerspective
+// MARK: - 天视图
+struct DayCalendarView: View {
+    let date: Date
     let events: [CalendarEvent]
-    @Binding var selectedEvent: CalendarEvent?
-    let emptyMessage: String
+    let onEventTap: (CalendarEvent) -> Void
+
+    private let hourHeight: CGFloat = 60
+    private let startHour = 6  // 从6点开始显示
+    private let endHour = 23   // 到23点结束
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 区块标题
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                    .font(.title2)
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(color)
-                Spacer()
-                Text("\(events.count)")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(color.opacity(0.2))
-                    .clipShape(Capsule())
-            }
+        ScrollViewReader { proxy in
+            ScrollView {
+                ZStack(alignment: .topLeading) {
+                    // 时间网格
+                    timeGrid
 
-            // 事件卡片
-            if events.isEmpty {
-                emptyStateView
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(events) { event in
-                        TimelineEventCard(
-                            event: event,
-                            perspective: perspective,
-                            isSelected: selectedEvent?.id == event.id
-                        )
-                        .onTapGesture {
-                            selectedEvent = event
+                    // 当前时间线
+                    if Calendar.current.isDateInToday(date) {
+                        currentTimeLine
+                    }
+
+                    // 事件块
+                    eventsOverlay
+                }
+                .padding(.leading, 50) // 为时间标签留空间
+            }
+            .onAppear {
+                // 滚动到当前时间附近
+                if Calendar.current.isDateInToday(date) {
+                    let currentHour = Calendar.current.component(.hour, from: Date())
+                    proxy.scrollTo(max(startHour, currentHour - 1), anchor: .top)
+                }
+            }
+        }
+    }
+
+    // MARK: - 时间网格
+    private var timeGrid: some View {
+        VStack(spacing: 0) {
+            ForEach(startHour...endHour, id: \.self) { hour in
+                HStack(alignment: .top, spacing: 8) {
+                    // 时间标签
+                    Text(String(format: "%02d:00", hour))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 45, alignment: .trailing)
+                        .offset(x: -50)
+
+                    // 分隔线
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 1)
+                }
+                .frame(height: hourHeight)
+                .id(hour)
+            }
+        }
+    }
+
+    // MARK: - 当前时间线
+    private var currentTimeLine: some View {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: Date())
+        let minute = calendar.component(.minute, from: Date())
+        let yOffset = CGFloat(hour - startHour) * hourHeight + CGFloat(minute) / 60 * hourHeight
+
+        return HStack(spacing: 4) {
+            Circle()
+                .fill(.red)
+                .frame(width: 8, height: 8)
+
+            Rectangle()
+                .fill(.red)
+                .frame(height: 2)
+        }
+        .offset(y: yOffset)
+    }
+
+    // MARK: - 事件覆盖层
+    private var eventsOverlay: some View {
+        ForEach(events) { event in
+            eventBlock(for: event)
+        }
+    }
+
+    private func eventBlock(for event: CalendarEvent) -> some View {
+        let calendar = Calendar.current
+        let eventHour = calendar.component(.hour, from: event.startTime)
+        let eventMinute = calendar.component(.minute, from: event.startTime)
+
+        let yOffset = CGFloat(eventHour - startHour) * hourHeight + CGFloat(eventMinute) / 60 * hourHeight
+
+        // 计算事件高度
+        let duration = event.endTime.timeIntervalSince(event.startTime) / 3600 // 小时数
+        let height = max(hourHeight * 0.5, CGFloat(duration) * hourHeight)
+
+        return Button {
+            onEventTap(event)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(2)
+
+                if height > 40 {
+                    Text(event.startTime.formatted(.dateTime.hour().minute()))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: height)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(eventColor(for: event))
+            )
+        }
+        .buttonStyle(.plain)
+        .offset(y: yOffset)
+        .padding(.horizontal, 4)
+    }
+
+    private func eventColor(for event: CalendarEvent) -> Color {
+        if event.isCompleted {
+            return .gray
+        }
+        return event.priority == .important ? .red.opacity(0.8) : .blue.opacity(0.8)
+    }
+}
+
+// MARK: - 周视图
+struct WeekCalendarView: View {
+    let startOfWeek: Date
+    let allEvents: [CalendarEvent]
+    let onEventTap: (CalendarEvent) -> Void
+
+    private let hourHeight: CGFloat = 50
+    private let startHour = 6
+    private let endHour = 23
+
+    var body: some View {
+        GeometryReader { geometry in
+            let timeColumnWidth: CGFloat = 58  // 包含右侧间距
+            let availableWidth = geometry.size.width - timeColumnWidth
+            let dayWidth = availableWidth / 7
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    // 星期头部
+                    weekHeader(dayWidth: dayWidth, timeColumnWidth: timeColumnWidth)
+
+                    // 时间网格 + 事件
+                    ZStack(alignment: .topLeading) {
+                        weekGrid(dayWidth: dayWidth, timeColumnWidth: timeColumnWidth)
+                        weekEvents(dayWidth: dayWidth, timeColumnWidth: timeColumnWidth)
+                        if isCurrentWeek {
+                            currentTimeLine(dayWidth: dayWidth, timeColumnWidth: timeColumnWidth)
                         }
                     }
                 }
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: color.opacity(0.1), radius: 5, y: 2)
-        )
-        .scaleEffect(perspective.scale)
-        .opacity(perspective.opacity)
-        .blur(radius: perspective.blur)
-        .padding(.vertical, 8)
     }
 
-    private var emptyStateView: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 8) {
-                Image(systemName: perspective == .past ? "checkmark.circle" : "calendar.badge.clock")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-                Text(emptyMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+    private var isCurrentWeek: Bool {
+        let calendar = Calendar.current
+        return calendar.isDate(Date(), equalTo: startOfWeek, toGranularity: .weekOfYear)
+    }
+
+    // MARK: - 星期头部
+    private func weekHeader(dayWidth: CGFloat, timeColumnWidth: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            // 空白角落
+            Color.clear
+                .frame(width: timeColumnWidth, height: 60)
+
+            // 7天
+            ForEach(0..<7, id: \.self) { dayOffset in
+                let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: startOfWeek)!
+                let isToday = Calendar.current.isDateInToday(date)
+
+                VStack(spacing: 4) {
+                    Text(dayOfWeek(for: date))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("\(Calendar.current.component(.day, from: date))")
+                        .font(.headline)
+                        .foregroundStyle(isToday ? .white : .primary)
+                        .frame(width: 28, height: 28)
+                        .background(isToday ? Color.blue : Color.clear)
+                        .clipShape(Circle())
+                }
+                .frame(width: dayWidth, height: 60)
             }
-            .padding(.vertical, 20)
-            Spacer()
+        }
+        .background(Color.primary.opacity(0.03))
+    }
+
+    private func dayOfWeek(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
+    }
+
+    // MARK: - 周网格
+    private func weekGrid(dayWidth: CGFloat, timeColumnWidth: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            ForEach(startHour...endHour, id: \.self) { hour in
+                HStack(spacing: 0) {
+                    // 时间标签
+                    Text(String(format: "%02d", hour))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: timeColumnWidth - 8, height: hourHeight, alignment: .trailing)
+                        .padding(.trailing, 8)
+
+                    // 7天的格子
+                    ForEach(0..<7, id: \.self) { _ in
+                        Rectangle()
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+                            .frame(width: dayWidth, height: hourHeight)
+                    }
+                }
+            }
         }
     }
-}
 
-// MARK: - 时间线事件卡片
-struct TimelineEventCard: View {
-    let event: CalendarEvent
-    let perspective: TimelinePerspective
-    let isSelected: Bool
+    // MARK: - 周事件
+    private func weekEvents(dayWidth: CGFloat, timeColumnWidth: CGFloat) -> some View {
+        ForEach(0..<7, id: \.self) { dayOffset in
+            let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: startOfWeek)!
+            let dayEvents = eventsForDate(date)
 
-    var body: some View {
-        HStack(spacing: 12) {
-            // 状态指示器
-            Circle()
-                .fill(statusColor)
-                .frame(width: 10, height: 10)
-
-            // 时间
-            VStack(alignment: .leading, spacing: 2) {
-                if perspective == .past {
-                    Text(event.startTime.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(event.startTime.formatted(.dateTime.hour().minute()))
-                    .font(.caption.monospacedDigit())
-                    .fontWeight(.medium)
-            }
-            .frame(width: 60, alignment: .leading)
-
-            // 内容
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                    .strikethrough(event.isCompleted)
-
-                if let location = event.location, !location.isEmpty {
-                    Label(location, systemImage: "location")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-
-            // 成就徽章（仅过去事件）
-            if perspective == .past && event.isCompleted {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-            }
-
-            // 优先级
-            if event.priority == .important {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.red)
+            ForEach(dayEvents) { event in
+                weekEventBlock(for: event, dayOffset: dayOffset, dayWidth: dayWidth, timeColumnWidth: timeColumnWidth)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+    }
+
+    private func eventsForDate(_ date: Date) -> [CalendarEvent] {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+
+        return allEvents.filter { event in
+            event.startTime >= startOfDay && event.startTime < endOfDay
+        }
+    }
+
+    private func weekEventBlock(for event: CalendarEvent, dayOffset: Int, dayWidth: CGFloat, timeColumnWidth: CGFloat) -> some View {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: event.startTime)
+        let minute = calendar.component(.minute, from: event.startTime)
+
+        let xOffset = timeColumnWidth + CGFloat(dayOffset) * dayWidth + 2
+        let yOffset = CGFloat(hour - startHour) * hourHeight + CGFloat(minute) / 60 * hourHeight
+
+        let duration = event.endTime.timeIntervalSince(event.startTime) / 3600
+        let height = max(hourHeight * 0.4, CGFloat(duration) * hourHeight - 2)
+
+        return Button {
+            onEventTap(event)
+        } label: {
+            Text(event.title)
+                .font(.caption2)
+                .lineLimit(2)
+                .padding(4)
+                .frame(width: dayWidth - 4, height: height, alignment: .topLeading)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(event.priority == .important ? Color.red.opacity(0.8) : Color.blue.opacity(0.8))
                 )
-        )
+        }
+        .buttonStyle(.plain)
+        .offset(x: xOffset, y: yOffset)
     }
 
-    private var statusColor: Color {
-        if event.isCompleted { return .green }
-        if event.priority == .important { return .red }
-        return .blue
+    // MARK: - 当前时间线
+    private func currentTimeLine(dayWidth: CGFloat, timeColumnWidth: CGFloat) -> some View {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: Date())
+        let minute = calendar.component(.minute, from: Date())
+        var dayOffset = calendar.component(.weekday, from: Date()) - calendar.firstWeekday
+        if dayOffset < 0 { dayOffset += 7 }
+
+        let xOffset = timeColumnWidth + CGFloat(dayOffset) * dayWidth
+        let yOffset = CGFloat(hour - startHour) * hourHeight + CGFloat(minute) / 60 * hourHeight
+
+        return HStack(spacing: 0) {
+            Circle()
+                .fill(.red)
+                .frame(width: 8, height: 8)
+            Rectangle()
+                .fill(.red)
+                .frame(width: dayWidth - 8, height: 2)
+        }
+        .offset(x: xOffset - 4, y: yOffset - 3)
     }
 }
 
@@ -374,7 +542,6 @@ struct CalendarEventRow: View {
 
     var body: some View {
         HStack {
-            // 时间指示器
             VStack(alignment: .center, spacing: 2) {
                 Text(event.startTime.formatted(.dateTime.hour().minute()))
                     .font(.caption.monospacedDigit())
@@ -422,94 +589,103 @@ struct CalendarEventRow: View {
     }
 }
 
-// MARK: - 日历事件详情视图
-struct CalendarEventDetailView: View {
+// MARK: - 日历事件详情 Sheet
+struct CalendarEventDetailSheet: View {
     @Bindable var event: CalendarEvent
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // 标题和状态
-                HStack {
-                    Text(event.title)
-                        .font(.title)
-                        .fontWeight(.bold)
-
-                    Spacer()
-
-                    Button {
-                        event.isCompleted.toggle()
-                    } label: {
-                        Image(systemName: event.isCompleted ? "checkmark.circle.fill" : "circle")
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // 标题和完成状态
+                    HStack {
+                        Text(event.title)
                             .font(.title2)
-                            .foregroundStyle(event.isCompleted ? .green : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
+                            .fontWeight(.bold)
 
-                // 时间信息
-                GroupBox("时间") {
+                        Spacer()
+
+                        Button {
+                            event.isCompleted.toggle()
+                        } label: {
+                            Image(systemName: event.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.title2)
+                                .foregroundStyle(event.isCompleted ? .green : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Divider()
+
+                    // 时间信息
                     VStack(alignment: .leading, spacing: 8) {
-                        if event.isAllDay {
-                            LabeledContent("日期", value: event.startTime.formatted(date: .long, time: .omitted))
-                            LabeledContent("全天事件", value: "是")
-                        } else {
-                            LabeledContent("开始", value: event.startTime.formatted())
-                            LabeledContent("结束", value: event.endTime.formatted())
+                        Label {
+                            if event.isAllDay {
+                                Text(event.startTime.formatted(date: .long, time: .omitted))
+                                Text("全天")
+                                    .font(.caption)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.blue.opacity(0.2))
+                                    .clipShape(Capsule())
+                            } else {
+                                VStack(alignment: .leading) {
+                                    Text(event.startTime.formatted(date: .abbreviated, time: .shortened))
+                                    Text("至 \(event.endTime.formatted(date: .omitted, time: .shortened))")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        } icon: {
+                            Image(systemName: "clock")
+                                .foregroundStyle(.blue)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                // 地点
-                if let location = event.location, !location.isEmpty {
-                    GroupBox("地点") {
-                        Text(location)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if let location = event.location, !location.isEmpty {
+                        Label(location, systemImage: "location")
+                            .foregroundStyle(.secondary)
                     }
-                }
 
-                // 备注
-                if let notes = event.notes, !notes.isEmpty {
-                    GroupBox("备注") {
+                    if let notes = event.notes, !notes.isEmpty {
+                        Divider()
                         Text(notes)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("事件详情")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        dismiss()
                     }
                 }
 
-                // 元信息
-                GroupBox("信息") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("优先级", value: event.priority.rawValue)
-                        LabeledContent("创建于", value: event.createdAt.formatted())
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showingEditSheet = true
+                        } label: {
+                            Label("编辑", systemImage: "pencil")
+                        }
+
+                        Button(role: .destructive) {
+                            modelContext.delete(event)
+                            dismiss()
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Spacer()
-            }
-            .padding()
-        }
-        .navigationTitle("事件详情")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingEditSheet = true
-                } label: {
-                    Label("编辑", systemImage: "pencil")
-                }
-            }
-
-            ToolbarItem(placement: .destructiveAction) {
-                Button(role: .destructive) {
-                    modelContext.delete(event)
-                } label: {
-                    Label("删除", systemImage: "trash")
                 }
             }
         }
+        .frame(minWidth: 350, minHeight: 300)
         .sheet(isPresented: $showingEditSheet) {
             CalendarEventEditView(event: event)
         }
@@ -593,7 +769,6 @@ struct CalendarEventEditView: View {
 
     private func saveEvent() {
         if let event = event {
-            // 更新现有事件
             event.title = title
             event.startTime = startTime
             event.endTime = isAllDay ? startTime : endTime
@@ -603,7 +778,6 @@ struct CalendarEventEditView: View {
             event.priority = priority
             event.updatedAt = Date()
         } else {
-            // 创建新事件
             let newEvent = CalendarEvent(
                 title: title,
                 startTime: startTime,

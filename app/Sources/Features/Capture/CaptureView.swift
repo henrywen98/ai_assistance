@@ -325,10 +325,7 @@ struct CaptureView: View {
 
         do {
             // 使用带 Memory 上下文的分类
-            let classification = try await LLMService.shared.classifyWithMemory(
-                capture.content,
-                in: context
-            )
+            let classification = try await LLMService.shared.classifyWithMemory(capture.content)
 
             // 使用转换服务应用分类结果
             ContainerConversionService.shared.autoConvert(

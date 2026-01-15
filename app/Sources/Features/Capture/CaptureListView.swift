@@ -181,10 +181,7 @@ struct CaptureListView: View {
         capture.status = .pending
 
         do {
-            let classification = try await LLMService.shared.classifyWithMemory(
-                capture.content,
-                in: modelContext
-            )
+            let classification = try await LLMService.shared.classifyWithMemory(capture.content)
 
             ContainerConversionService.shared.autoConvert(
                 capture,
@@ -406,15 +403,19 @@ struct CaptureDetailView: View {
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 8) {
-                if let summary = capture.aiSummary {
-                    LabeledContent("摘要", value: summary)
+                if let reason = capture.aiSummary {
+                    LabeledContent("分类理由", value: reason)
                 }
 
                 if let time = capture.extractedTime {
                     LabeledContent("提取时间", value: time.formatted())
                 }
 
-                LabeledContent("建议优先级", value: capture.suggestedPriority.rawValue)
+                // 只在重要优先级时显示
+                if capture.suggestedPriority == .important {
+                    LabeledContent("优先级", value: "重要")
+                        .foregroundStyle(.red)
+                }
             }
             .padding()
             .background(.quaternary)

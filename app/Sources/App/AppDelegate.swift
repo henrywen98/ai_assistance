@@ -19,7 +19,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 注册默认设置值
         UserDefaults.standard.register(defaults: [
-            "showInDock": false,
             "directCaptureOnMenuBarClick": false
         ])
 
@@ -27,11 +26,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyManager.shared.setupHotkeys()
         logger.info("全局快捷键已配置 (⌘+Shift+V)")
 
-        // 恢复 Dock 图标可见性设置
-        let showInDock = UserDefaults.standard.bool(forKey: "showInDock")
-        if showInDock {
-            NSApp.setActivationPolicy(.regular)
-        }
+        // 始终显示在 Dock 中
+        NSApp.setActivationPolicy(.regular)
 
         // 启动时自动显示捕获箱窗口由 SwiftUI 的 .defaultLaunchBehavior(.presented) 处理
     }

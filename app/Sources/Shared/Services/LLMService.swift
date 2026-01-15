@@ -1,6 +1,5 @@
 import Foundation
 import OpenAI
-import SwiftData
 
 /// LLM 服务 - 负责 AI 分类
 @MainActor
@@ -77,19 +76,11 @@ final class LLMService {
     }
 
     /// 分类文本内容（含 Memory 上下文）
-    func classifyWithMemory(_ text: String, in context: ModelContext) async throws -> Classification {
-        // 获取 Memory 上下文
-        let memoryContext = MemoryService.shared.getCommonInfoContext(in: context)
-
-        // 获取偏好规则
-        let preferences = getPreferenceRules(for: text, in: context)
-
-        var fullContext = memoryContext
-        if !preferences.isEmpty {
-            fullContext += "\n\n用户偏好规则:\n\(preferences)"
-        }
-
-        return try await classifyWithContext(text, memoryContext: fullContext.isEmpty ? nil : fullContext)
+    /// 使用 MemoryManager 中缓存的用户自定义 Memory.md 内容
+    func classifyWithMemory(_ text: String) async throws -> Classification {
+        // 从 MemoryManager 获取用户自定义的 Memory 内容
+        let memoryContext = MemoryManager.shared.getMemoryContext()
+        return try await classifyWithContext(text, memoryContext: memoryContext)
     }
 
     /// 内部分类方法
@@ -100,17 +91,19 @@ final class LLMService {
 
         var systemPrompt = """
         你是一个智能助手，负责将用户输入的内容分类到以下三个容器之一：
-        1. calendar - 日历事件（有明确时间的安排）
-        2. todo - 待办事项（需要完成的任务）
-        3. note - 笔记（想法、灵感、信息记录）
+        1. calendar - 日历事件（有明确时间的安排，如会议、约会）
+        2. todo - 待办事项（需要完成的任务、行动项）
+        3. note - 笔记（想法、灵感、信息记录、学习内容）
 
         请返回 JSON 格式：
         {
             "container": "calendar|todo|note",
             "extractedTime": "ISO8601格式时间（如有）",
             "suggestedPriority": "important|normal",
-            "summary": "简短摘要"
+            "summary": "简要说明为什么分类到这个类别（10字以内）"
         }
+
+        注意：summary 字段应说明分类理由，例如"包含会议时间"、"是一个任务"、"记录想法"等。
         """
 
         // 如果有 Memory 上下文，添加到 prompt
@@ -136,32 +129,6 @@ final class LLMService {
         }
 
         return try parseClassification(from: content)
-    }
-
-    /// 获取适用的偏好规则
-    private func getPreferenceRules(for text: String, in context: ModelContext) -> String {
-        let descriptor = FetchDescriptor<MemoryEntry>(
-            sortBy: [SortDescriptor(\.usageCount, order: .reverse)]
-        )
-
-        guard let entries = try? context.fetch(descriptor) else { return "" }
-
-        let preferences = entries.filter { entry in
-            entry.type == .preference &&
-            entry.isActive &&
-            text.localizedCaseInsensitiveContains(entry.keyword)
-        }
-
-        if preferences.isEmpty { return "" }
-
-        return preferences.map { entry in
-            if let container = entry.associatedContainer {
-                return "- 包含「\(entry.keyword)」的内容通常是\(container.rawValue)"
-            } else if let priority = entry.associatedPriority {
-                return "- 包含「\(entry.keyword)」的内容通常优先级为\(priority.rawValue)"
-            }
-            return ""
-        }.filter { !$0.isEmpty }.joined(separator: "\n")
     }
 
     /// 解析分类结果
