@@ -164,20 +164,30 @@ struct MenuBarContentView: View {
             Divider()
 
             // 快捷入口
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 QuickAccessButton(icon: "tray.full", label: "捕获箱", color: .blue) {
                     NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "capture-list")
                 }
 
-                QuickAccessButton(icon: "sun.horizon.fill", label: "今日", color: .orange) {
+                QuickAccessButton(icon: "calendar", label: "日历", color: .red) {
                     NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "today-overview")
+                    openWindow(id: "calendar")
                 }
 
-                QuickAccessButton(icon: "checkmark.seal.fill", label: "成就", color: .green) {
+                QuickAccessButton(icon: "checklist", label: "待办", color: .orange) {
                     NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "achievement")
+                    openWindow(id: "todo")
+                }
+
+                QuickAccessButton(icon: "note.text", label: "笔记", color: .green) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openWindow(id: "notes")
+                }
+
+                QuickAccessButton(icon: "sun.horizon.fill", label: "今日", color: .yellow) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openWindow(id: "today-overview")
                 }
 
                 QuickAccessButton(icon: "clock.badge.checkmark", label: "工时表", color: .purple) {
@@ -208,7 +218,7 @@ struct MenuBarContentView: View {
             .padding(.horizontal)
         }
         .padding(.vertical, 12)
-        .frame(width: 280)
+        .frame(width: 320)
         .onChange(of: pendingCaptures.count, initial: true) { _, newCount in
             appState.updatePendingCount(newCount)
         }
