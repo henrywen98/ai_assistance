@@ -86,57 +86,29 @@ final class ContainerConversionService {
         classification: Classification,
         in context: ModelContext
     ) {
-        // 分析并存储常用信息
-        MemoryService.shared.analyzeAndStoreCommonInfo(
-            content: capture.content,
-            in: context
-        )
-
-        // 应用 Memory 偏好调整
-        let adjustedClassification = MemoryService.shared.adjustClassification(
-            content: capture.content,
-            aiResult: classification,
-            in: context
-        )
-
         // 更新 CaptureItem 属性
-        capture.extractedTime = adjustedClassification.extractedTime
-        capture.suggestedPriority = adjustedClassification.suggestedPriority
-        capture.aiSummary = adjustedClassification.summary
+        capture.extractedTime = classification.extractedTime
+        capture.suggestedPriority = classification.suggestedPriority
+        capture.aiSummary = classification.summary
 
         // 根据分类结果创建实际实体
-        switch adjustedClassification.container {
+        switch classification.container {
         case .calendar:
-            let startTime = adjustedClassification.extractedTime ?? Date()
+            let startTime = classification.extractedTime ?? Date()
             _ = convertToCalendar(capture, startTime: startTime, in: context)
         case .todo:
-            _ = convertToTodo(capture, dueDate: adjustedClassification.extractedTime, in: context)
+            _ = convertToTodo(capture, dueDate: classification.extractedTime, in: context)
         case .note:
             _ = convertToNote(capture, in: context)
         }
-
-        // 建立智能关联
-        MemoryService.shared.establishAssociations(for: capture, in: context)
     }
 
-    /// 手动更改容器类型（记录偏好学习）
+    /// 手动更改容器类型
     func manualConvert(
         _ capture: CaptureItem,
         to newContainer: ContainerType,
         in context: ModelContext
     ) {
-        let originalContainer = capture.container
-
-        // 记录纠正行为（用于偏好学习）
-        if let original = originalContainer, original != newContainer {
-            MemoryService.shared.recordClassificationCorrection(
-                originalContent: capture.content,
-                originalContainer: original,
-                correctedContainer: newContainer,
-                in: context
-            )
-        }
-
         // 执行转换
         switch newContainer {
         case .calendar:

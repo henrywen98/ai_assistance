@@ -62,7 +62,8 @@ final class ClassificationQueueService {
     /// 分类单个项目
     private func classifyItem(_ item: CaptureItem, context: ModelContext) async {
         do {
-            let classification = try await LLMService.shared.classify(item.content)
+            // 使用 Memory.md 上下文进行分类
+            let classification = try await LLMService.shared.classifyWithMemory(item.content)
 
             ContainerConversionService.shared.autoConvert(
                 item,

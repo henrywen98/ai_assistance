@@ -11,14 +11,19 @@ struct TodoListView: View {
     @State private var filterCompleted = false
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedTodo) {
+        VStack(spacing: 0) {
+            // 顶部工具栏
+            todoToolbar
+
+            // 待办列表
+            List {
                 // 未完成
                 if !pendingTodos.isEmpty {
                     Section("待完成 (\(pendingTodos.count))") {
                         ForEach(pendingTodos) { todo in
                             TodoRow(todo: todo)
-                                .tag(todo)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedTodo = todo }
                         }
                         .onDelete(perform: deleteTodos)
                     }
@@ -29,42 +34,56 @@ struct TodoListView: View {
                     Section("已完成 (\(completedTodos.count))") {
                         ForEach(completedTodos) { todo in
                             TodoRow(todo: todo)
-                                .tag(todo)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedTodo = todo }
                         }
                         .onDelete(perform: deleteCompletedTodos)
                     }
                 }
-            }
-            .navigationTitle("待办事项")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Label("新建", systemImage: "plus")
-                    }
-                }
 
-                ToolbarItem {
-                    Toggle(isOn: $filterCompleted) {
-                        Label("显示已完成", systemImage: "checkmark.circle")
-                    }
+                // 空状态
+                if pendingTodos.isEmpty && (!filterCompleted || completedTodos.isEmpty) {
+                    ContentUnavailableView(
+                        "暂无待办",
+                        systemImage: "checklist",
+                        description: Text("点击右上角 + 创建新待办")
+                    )
                 }
-            }
-            .sheet(isPresented: $showingAddSheet) {
-                TodoEditView(todo: nil)
-            }
-        } detail: {
-            if let todo = selectedTodo {
-                TodoDetailView(todo: todo)
-            } else {
-                ContentUnavailableView(
-                    "选择一个待办",
-                    systemImage: "checklist",
-                    description: Text("从左侧列表选择查看详情")
-                )
             }
         }
+        .sheet(item: $selectedTodo) { todo in
+            TodoDetailSheet(todo: todo)
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            TodoEditView(todo: nil)
+        }
+    }
+
+    // MARK: - 工具栏
+    private var todoToolbar: some View {
+        HStack {
+            Text("待办事项")
+                .font(.headline)
+
+            Spacer()
+
+            Toggle(isOn: $filterCompleted) {
+                Label("显示已完成", systemImage: "checkmark.circle")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+
+            Button {
+                showingAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var pendingTodos: [TodoItem] {
@@ -78,9 +97,6 @@ struct TodoListView: View {
     private func deleteTodos(at offsets: IndexSet) {
         for index in offsets {
             let todo = pendingTodos[index]
-            if selectedTodo == todo {
-                selectedTodo = nil
-            }
             modelContext.delete(todo)
         }
     }
@@ -88,9 +104,6 @@ struct TodoListView: View {
     private func deleteCompletedTodos(at offsets: IndexSet) {
         for index in offsets {
             let todo = completedTodos[index]
-            if selectedTodo == todo {
-                selectedTodo = nil
-            }
             modelContext.delete(todo)
         }
     }
@@ -147,86 +160,107 @@ struct TodoRow: View {
     }
 }
 
-// MARK: - 待办详情
-struct TodoDetailView: View {
+// MARK: - 待办详情 Sheet
+struct TodoDetailSheet: View {
     @Bindable var todo: TodoItem
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // 标题和完成状态
-                HStack {
-                    Button {
-                        withAnimation {
-                            todo.isCompleted.toggle()
-                            if todo.isCompleted {
-                                todo.completedAt = Date()
-                            } else {
-                                todo.completedAt = nil
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // 标题和完成状态
+                    HStack {
+                        Button {
+                            withAnimation {
+                                todo.isCompleted.toggle()
+                                if todo.isCompleted {
+                                    todo.completedAt = Date()
+                                } else {
+                                    todo.completedAt = nil
+                                }
                             }
+                        } label: {
+                            Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.title)
+                                .foregroundStyle(todo.isCompleted ? .green : .secondary)
                         }
-                    } label: {
-                        Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.title)
-                            .foregroundStyle(todo.isCompleted ? .green : .secondary)
+                        .buttonStyle(.plain)
+
+                        Text(todo.title)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .strikethrough(todo.isCompleted)
                     }
-                    .buttonStyle(.plain)
 
-                    Text(todo.title)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .strikethrough(todo.isCompleted)
-                }
+                    Divider()
 
-                // 详细信息
-                if let itemDescription = todo.itemDescription, !itemDescription.isEmpty {
-                    GroupBox("备注") {
-                        Text(itemDescription)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
-                GroupBox("信息") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("优先级", value: todo.priority.rawValue)
+                    // 信息
+                    VStack(alignment: .leading, spacing: 12) {
+                        if todo.priority == .important {
+                            Label("重要", systemImage: "exclamationmark.circle.fill")
+                                .foregroundStyle(.orange)
+                        }
 
                         if let dueDate = todo.dueDate {
-                            LabeledContent("截止日期", value: dueDate.formatted())
+                            Label {
+                                Text(dueDate.formatted(date: .abbreviated, time: .shortened))
+                            } icon: {
+                                Image(systemName: "calendar")
+                                    .foregroundStyle(.blue)
+                            }
                         }
 
                         if let completedAt = todo.completedAt {
-                            LabeledContent("完成于", value: completedAt.formatted())
+                            Label {
+                                Text("完成于 \(completedAt.formatted(date: .abbreviated, time: .shortened))")
+                            } icon: {
+                                Image(systemName: "checkmark.circle")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+
+                    // 备注
+                    if let itemDescription = todo.itemDescription, !itemDescription.isEmpty {
+                        Divider()
+                        Text(itemDescription)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("待办详情")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showingEditSheet = true
+                        } label: {
+                            Label("编辑", systemImage: "pencil")
                         }
 
-                        LabeledContent("创建于", value: todo.createdAt.formatted())
+                        Button(role: .destructive) {
+                            modelContext.delete(todo)
+                            dismiss()
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Spacer()
-            }
-            .padding()
-        }
-        .navigationTitle("待办详情")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingEditSheet = true
-                } label: {
-                    Label("编辑", systemImage: "pencil")
-                }
-            }
-
-            ToolbarItem(placement: .destructiveAction) {
-                Button(role: .destructive) {
-                    modelContext.delete(todo)
-                } label: {
-                    Label("删除", systemImage: "trash")
                 }
             }
         }
+        .frame(minWidth: 350, minHeight: 300)
         .sheet(isPresented: $showingEditSheet) {
             TodoEditView(todo: todo)
         }

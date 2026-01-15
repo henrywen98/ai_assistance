@@ -21,7 +21,7 @@ struct AIAssistantApp: App {
     }
 
     var body: some Scene {
-        // 菜单栏应用 - Story 1.2
+        // 菜单栏 - 简化为快速捕获入口
         MenuBarExtra {
             MenuBarContentView()
                 .environment(AppEnvironment.shared.appState)
@@ -44,67 +44,18 @@ struct AIAssistantApp: App {
                 .modelContainer(modelContainer)
         }
 
-        // 捕获列表窗口（启动时自动显示）
-        Window("捕获箱", id: "capture-list") {
-            CaptureListView()
+        // 主面板窗口（启动时自动显示）
+        Window("AI Assistant", id: "main-panel") {
+            MainPanelView()
                 .environment(AppEnvironment.shared.appState)
                 .modelContainer(modelContainer)
         }
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 1000, height: 700)
         .defaultLaunchBehavior(.presented)
-
-        // 日历窗口
-        Window("日历", id: "calendar") {
-            CalendarListView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .defaultSize(width: 900, height: 600)
-
-        // 待办窗口
-        Window("待办", id: "todo") {
-            TodoListView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .defaultSize(width: 800, height: 600)
-
-        // 笔记窗口
-        Window("笔记", id: "notes") {
-            NotesListView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .defaultSize(width: 800, height: 600)
-
-        // 成就窗口
-        Window("成就", id: "achievement") {
-            AchievementView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .defaultSize(width: 900, height: 600)
-
-        // 今日概览窗口
-        Window("今日概览", id: "today-overview") {
-            TodayOverviewView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-
-        // Time Sheet 窗口
-        Window("Time Sheet", id: "timesheet") {
-            TimeSheetView()
-                .environment(AppEnvironment.shared.appState)
-                .modelContainer(modelContainer)
-        }
-        .defaultSize(width: 700, height: 500)
     }
 }
 
-/// 菜单栏弹出窗口内容
+/// 菜单栏弹出窗口内容（简化版 - 快速捕获入口）
 struct MenuBarContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
@@ -120,78 +71,46 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            // 头部
-            HStack {
-                Image(systemName: "brain.head.profile")
-                    .font(.title2)
-                    .foregroundStyle(.purple)
-                Text("AI Assistant")
-                    .font(.headline)
-                Spacer()
+        VStack(spacing: 12) {
+            // 快速捕获按钮
+            Button {
+                CaptureWindowController.shared.showWindow()
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("新建捕获")
+                    Spacer()
+                    Text("⌘⇧V")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(.quaternary)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            .padding(.horizontal)
+            .buttonStyle(.plain)
 
             Divider()
 
-            // 快速捕获区域
-            VStack(spacing: 12) {
-                Button {
-                    CaptureWindowController.shared.showWindow()
-                } label: {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("新建捕获")
-                        Spacer()
-                        Text("⌘⇧V")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.quaternary)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            // 打开主面板
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "main-panel")
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "macwindow")
+                        .foregroundStyle(.blue)
+                    Text("打开主面板")
+                    Spacer()
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            // 快捷入口
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                QuickAccessButton(icon: "tray.full", label: "捕获箱", color: .blue) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "capture-list")
-                }
-
-                QuickAccessButton(icon: "calendar", label: "日历", color: .red) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "calendar")
-                }
-
-                QuickAccessButton(icon: "checklist", label: "待办", color: .orange) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "todo")
-                }
-
-                QuickAccessButton(icon: "note.text", label: "笔记", color: .green) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "notes")
-                }
-
-                QuickAccessButton(icon: "sun.horizon.fill", label: "今日", color: .yellow) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "today-overview")
-                }
-
-                QuickAccessButton(icon: "clock.badge.checkmark", label: "工时表", color: .purple) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "timesheet")
-                }
-            }
+            .buttonStyle(.plain)
 
             Divider()
 
@@ -202,7 +121,7 @@ struct MenuBarContentView: View {
                     openSettings()
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                .foregroundStyle(.secondary)
 
                 Spacer()
 
@@ -212,10 +131,9 @@ struct MenuBarContentView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
             }
-            .padding(.horizontal)
         }
-        .padding(.vertical, 12)
-        .frame(width: 320)
+        .padding(12)
+        .frame(width: 240)
         .onChange(of: pendingCaptures.count, initial: true) { _, newCount in
             appState.updatePendingCount(newCount)
         }
@@ -227,14 +145,14 @@ struct MenuBarContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openDashboard)) { _ in
-            // 点击 Dock 图标时打开捕获箱窗口
+            // 点击 Dock 图标时打开主面板
             NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "capture-list")
+            openWindow(id: "main-panel")
         }
     }
 }
 
-/// 设置视图（占位）
+/// 设置视图
 struct SettingsView: View {
     var body: some View {
         TabView {
@@ -243,12 +161,17 @@ struct SettingsView: View {
                     Label("通用", systemImage: "gear")
                 }
 
+            MemorySettingsView()
+                .tabItem {
+                    Label("Memory", systemImage: "brain")
+                }
+
             ShortcutSettingsView()
                 .tabItem {
                     Label("快捷键", systemImage: "keyboard")
                 }
         }
-        .frame(width: 450, height: 250)
+        .frame(width: 600, height: 500)
     }
 }
 
@@ -269,9 +192,6 @@ struct GeneralSettingsView: View {
 
     /// 点击菜单栏直接打开捕获
     @AppStorage("directCaptureOnMenuBarClick") private var directCaptureMode = false
-
-    /// 在 Dock 中显示图标
-    @AppStorage("showInDock") private var showInDock = false
 
     var body: some View {
         Form {
@@ -324,15 +244,7 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("显示方式") {
-                Toggle("在 Dock 中显示图标", isOn: $showInDock)
-                    .onChange(of: showInDock) { _, newValue in
-                        updateDockVisibility(newValue)
-                    }
-                Text("菜单栏拥挤时可启用此选项，从 Dock 访问应用")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
+            Section("菜单栏") {
                 Toggle("点击菜单栏直接打开捕获窗口", isOn: $directCaptureMode)
                 Text("启用后点击菜单栏图标将直接弹出捕获输入框")
                     .font(.caption)
@@ -347,17 +259,6 @@ struct GeneralSettingsView: View {
         }
         .onAppear {
             isConfigured = LLMService.shared.isConfigured
-            // 恢复 Dock 可见性设置
-            updateDockVisibility(showInDock)
-        }
-    }
-
-    /// 更新 Dock 图标可见性
-    private func updateDockVisibility(_ show: Bool) {
-        if show {
-            NSApp.setActivationPolicy(.regular)
-        } else {
-            NSApp.setActivationPolicy(.accessory)
         }
     }
 
@@ -389,6 +290,91 @@ struct GeneralSettingsView: View {
     }
 }
 
+/// Memory 设置
+struct MemorySettingsView: View {
+    @State private var memoryContent: String = ""
+    @State private var showingSaveConfirmation = false
+    @State private var hasUnsavedChanges = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 说明
+            VStack(alignment: .leading, spacing: 4) {
+                Text("个人上下文 (Memory)")
+                    .font(.headline)
+                Text("在此编辑你的个人偏好和上下文信息，AI 会根据这些内容更准确地分类你的输入。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // 编辑器
+            TextEditor(text: $memoryContent)
+                .font(.system(.body, design: .monospaced))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .border(Color.secondary.opacity(0.3), width: 1)
+                .onChange(of: memoryContent) { _, _ in
+                    hasUnsavedChanges = true
+                }
+
+            // 底部工具栏
+            HStack {
+                // 文件位置
+                Button {
+                    revealInFinder()
+                } label: {
+                    Label("在 Finder 中显示", systemImage: "folder")
+                }
+                .buttonStyle(.link)
+
+                Spacer()
+
+                // 状态
+                if hasUnsavedChanges {
+                    Text("有未保存的更改")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                // 保存按钮
+                Button("保存") {
+                    saveMemory()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!hasUnsavedChanges)
+            }
+        }
+        .padding()
+        .onAppear {
+            loadMemory()
+        }
+        .alert("保存成功", isPresented: $showingSaveConfirmation) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text("Memory 已保存，下次分类时将使用新的上下文。")
+        }
+    }
+
+    private func loadMemory() {
+        memoryContent = MemoryManager.shared.getRawContent()
+        hasUnsavedChanges = false
+    }
+
+    private func saveMemory() {
+        do {
+            try MemoryManager.shared.saveMemory(memoryContent)
+            hasUnsavedChanges = false
+            showingSaveConfirmation = true
+        } catch {
+            print("[MemorySettings] Failed to save: \(error.localizedDescription)")
+        }
+    }
+
+    private func revealInFinder() {
+        let url = MemoryManager.shared.memoryFilePath
+        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+    }
+}
+
 /// 快捷键设置
 struct ShortcutSettingsView: View {
     var body: some View {
@@ -396,31 +382,6 @@ struct ShortcutSettingsView: View {
             KeyboardShortcuts.Recorder("快速捕获:", name: .quickCapture)
         }
         .padding()
-    }
-}
-
-/// 快捷入口按钮
-struct QuickAccessButton: View {
-    let icon: String
-    let label: String
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
-                Text(label)
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(.quaternary)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 }
 
