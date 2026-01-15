@@ -18,9 +18,6 @@ struct AIAssistantApp: App {
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
-
-        // 配置全局环境
-        AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
     }
 
     var body: some Scene {
@@ -29,6 +26,9 @@ struct AIAssistantApp: App {
             MenuBarContentView()
                 .environment(appState)
                 .modelContainer(modelContainer)
+                .onAppear {
+                    configureEnvironmentIfNeeded()
+                }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "brain.head.profile")
@@ -104,12 +104,18 @@ struct AIAssistantApp: App {
         }
         .defaultSize(width: 700, height: 500)
     }
+
+    /// 配置全局环境（延迟初始化）
+    private func configureEnvironmentIfNeeded() {
+        AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
+    }
 }
 
 /// 菜单栏弹出窗口内容
 struct MenuBarContentView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Query private var allCaptures: [CaptureItem]
 
     private var pendingCaptures: [CaptureItem] {
@@ -117,7 +123,6 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        let _ = updatePendingCount()
         VStack(spacing: 16) {
             // 头部
             HStack {
@@ -161,18 +166,22 @@ struct MenuBarContentView: View {
             // 快捷入口
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 QuickAccessButton(icon: "tray.full", label: "捕获箱", color: .blue) {
+                    NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "capture-list")
                 }
 
                 QuickAccessButton(icon: "sun.horizon.fill", label: "今日", color: .orange) {
+                    NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "today-overview")
                 }
 
                 QuickAccessButton(icon: "checkmark.seal.fill", label: "成就", color: .green) {
+                    NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "achievement")
                 }
 
                 QuickAccessButton(icon: "clock.badge.checkmark", label: "工时表", color: .purple) {
+                    NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "timesheet")
                 }
             }
@@ -182,7 +191,8 @@ struct MenuBarContentView: View {
             // 底部操作
             HStack {
                 Button("设置...") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.blue)
@@ -199,10 +209,9 @@ struct MenuBarContentView: View {
         }
         .padding(.vertical, 12)
         .frame(width: 280)
-    }
-
-    private func updatePendingCount() {
-        appState.updatePendingCount(pendingCaptures.count)
+        .onChange(of: pendingCaptures.count, initial: true) { _, newCount in
+            appState.updatePendingCount(newCount)
+        }
     }
 }
 
@@ -276,7 +285,7 @@ struct GeneralSettingsView: View {
             isConfigured = true
             showingSaveConfirmation = true
         } catch {
-            // Handle error
+            print("[Settings] Failed to save API key: \(error.localizedDescription)")
         }
     }
 }

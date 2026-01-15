@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
 import SwiftData
+import os
 
 /// 捕获窗口控制器 - 管理快速捕获浮窗
 @MainActor
 final class CaptureWindowController {
+    private let logger = Logger(subsystem: "com.henry.AIAssistant", category: "CaptureWindow")
     /// 单例
     static let shared = CaptureWindowController()
 
@@ -50,10 +52,31 @@ final class CaptureWindowController {
 
     /// 创建窗口
     private func createWindow() {
-        guard let modelContainer = AppEnvironment.shared.modelContainer,
-              let appState = AppEnvironment.shared.appState else {
-            return
+        logger.info("createWindow() 被调用")
+
+        // 获取或创建环境
+        let modelContainer: ModelContainer
+        let appState: AppState
+
+        if let container = AppEnvironment.shared.modelContainer,
+           let state = AppEnvironment.shared.appState {
+            modelContainer = container
+            appState = state
+            logger.info("使用 AppEnvironment 中的环境")
+        } else {
+            // 备用方案：自己创建
+            logger.warning("AppEnvironment 未配置，创建新环境")
+            do {
+                modelContainer = try DataContainer.createContainer()
+                appState = AppState()
+                AppEnvironment.shared.configure(modelContainer: modelContainer, appState: appState)
+            } catch {
+                logger.error("创建环境失败: \(error.localizedDescription)")
+                return
+            }
         }
+
+        logger.info("环境检查通过，开始创建窗口")
 
         let contentView = CaptureView()
             .environment(appState)
@@ -61,7 +84,7 @@ final class CaptureWindowController {
 
         let hostingView = NSHostingView(rootView: contentView)
 
-        let window = NSWindow(
+        let window = KeyableWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 150),
             styleMask: [.borderless],
             backing: .buffered,
@@ -80,6 +103,12 @@ final class CaptureWindowController {
 
         self.window = window
     }
+}
+
+// MARK: - 自定义窗口类（支持无边框窗口接收键盘输入）
+private final class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 // MARK: - 窗口代理

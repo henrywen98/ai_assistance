@@ -96,12 +96,15 @@ final class LLMService {
             systemPrompt += "\n\n参考以下用户上下文信息，以更准确地分类：\n\(memoryContext)"
         }
 
+        // 从环境变量读取模型名，默认使用 qwen-plus
+        let modelName = ProcessInfo.processInfo.environment["LLM_MODEL"] ?? "qwen-plus"
+
         let query = ChatQuery(
             messages: [
                 .init(role: .system, content: systemPrompt)!,
                 .init(role: .user, content: text)!
             ],
-            model: .gpt3_5Turbo
+            model: .init(modelName)
         )
 
         let result = try await openAI.chats(query: query)

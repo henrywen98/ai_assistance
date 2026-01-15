@@ -36,32 +36,11 @@ struct CaptureView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.2), radius: 20)
-        .onKeyPress(.return, phases: .down) { event in
-            // 检查是否有修饰键（Shift 用于换行）
-            if event.modifiers.contains(.shift) {
-                return .ignored // 让系统处理换行
-            }
-            // 按 Enter 提交
-            Task {
-                await submitCapture()
-            }
-            return .handled
-        }
         .onExitCommand {
             dismiss()
         }
         .onAppear {
             isInputFocused = true
-            // 自动粘贴剪贴板内容（如果为空且剪贴板有文本）
-            if viewModel.inputText.isEmpty {
-                checkAndPasteClipboard()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willBecomeActiveNotification)) { _ in
-            // 应用激活时检查剪贴板
-            if viewModel.inputText.isEmpty {
-                checkAndPasteClipboard()
-            }
         }
         .onPasteCommand(of: [.image, .tiff, .png]) { providers in
             // 处理图片粘贴
@@ -77,48 +56,25 @@ struct CaptureView: View {
         }
     }
 
-    /// 检查并粘贴剪贴板内容（文本或图片）
-    private func checkAndPasteClipboard() {
-        let pasteboard = NSPasteboard.general
-
-        // 优先检查图片
-        if let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png),
-           let image = NSImage(data: imageData) {
-            viewModel.capturedImage = image
-            return
-        }
-
-        // 检查文本
-        if let text = pasteboard.string(forType: .string), !text.isEmpty {
-            // 只自动粘贴较短的文本（避免粘贴大段代码等）
-            if text.count <= 500 {
-                viewModel.inputText = text
-            }
-        }
-    }
-
     // MARK: - 输入区域
     private var inputArea: some View {
-        VStack(spacing: 0) {
-            TextEditor(text: $viewModel.inputText)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .background(.clear)
-                .frame(minHeight: 80, maxHeight: 200)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .focused($isInputFocused)
-
-            if viewModel.inputText.isEmpty {
-                Text("输入想法，或按 ⌘+V 粘贴...")
-                    .font(.body)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .allowsHitTesting(false)
-                    .offset(y: -60)
+        TextEditor(text: $viewModel.inputText)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 80, maxHeight: 200)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .focused($isInputFocused)
+            .overlay(alignment: .topLeading) {
+                if viewModel.inputText.isEmpty {
+                    Text("输入想法，或按 ⌘+V 粘贴...")
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 21)
+                        .padding(.top, 20)
+                        .allowsHitTesting(false)
+                }
             }
-        }
     }
 
     // MARK: - 图片预览
@@ -173,34 +129,52 @@ struct CaptureView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Enter 发送 · ⇧Enter 换行")
+                Text("⌘V 粘贴")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
 
             Spacer()
 
-            Text("⌘V 粘贴")
+            // 提交按钮
+            Button {
+                Task {
+                    await submitCapture()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("发送")
+                    Image(systemName: "arrow.up.circle.fill")
+                }
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(canSubmit ? Color.accentColor : Color.gray)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSubmit)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
     }
 
+    private var canSubmit: Bool {
+        !viewModel.inputText.isEmpty || viewModel.capturedImage != nil
+    }
+
     // MARK: - 提交捕获
     private func submitCapture() async {
-        guard !viewModel.inputText.isEmpty || viewModel.capturedImage != nil else {
-            return
-        }
+        guard canSubmit else { return }
 
         viewModel.isProcessing = true
         defer { viewModel.isProcessing = false }
 
         do {
             var contentText = viewModel.inputText
-            var imageURL: URL? = nil
+            var imageURL: URL?
 
             // 如果有图片，执行 OCR
             if let image = viewModel.capturedImage {

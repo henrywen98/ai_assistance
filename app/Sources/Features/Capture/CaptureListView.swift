@@ -114,6 +114,16 @@ struct CaptureListView: View {
     @ViewBuilder
     private func captureContextMenu(for capture: CaptureItem) -> some View {
         Button {
+            Task {
+                await reclassifyCapture(capture)
+            }
+        } label: {
+            Label("重新分类", systemImage: "sparkles")
+        }
+
+        Divider()
+
+        Button {
             capture.container = .calendar
             capture.status = .confirmed
         } label: {
@@ -140,6 +150,36 @@ struct CaptureListView: View {
             deleteCapture(capture)
         } label: {
             Label("删除", systemImage: "trash")
+        }
+    }
+
+    // MARK: - 重新分类
+    @MainActor
+    private func reclassifyCapture(_ capture: CaptureItem) async {
+        guard LLMService.shared.isConfigured else {
+            print("[CaptureList] LLM service not configured")
+            return
+        }
+
+        capture.status = .pending
+
+        do {
+            let classification = try await LLMService.shared.classifyWithMemory(
+                capture.content,
+                in: modelContext
+            )
+
+            ContainerConversionService.shared.autoConvert(
+                capture,
+                classification: classification,
+                in: modelContext
+            )
+
+            try modelContext.save()
+            print("[CaptureList] Reclassified capture: \(classification.container)")
+        } catch {
+            capture.status = .failed
+            print("[CaptureList] Reclassify failed: \(error.localizedDescription)")
         }
     }
 
